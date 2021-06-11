@@ -29,13 +29,15 @@
 
 /* Addons */
 #define FLECS_BULK
+#define FLECS_DIRECT_ACCESS
 #define FLECS_DBG
 #define FLECS_MODULE
 #define FLECS_PARSER
+#define FLECS_PLECS
 #define FLECS_QUEUE
 #define FLECS_READER_WRITER
+#define FLECS_RULES
 #define FLECS_SNAPSHOT
-#define FLECS_DIRECT_ACCESS
 #define FLECS_STATS
 #endif // ifndef FLECS_CUSTOM_BUILD
 
@@ -84,6 +86,9 @@ typedef struct ecs_query_t ecs_query_t;
 
 /** A filter allows for uncached, ad hoc iteration over ECS data */
 typedef struct ecs_filter_t ecs_filter_t;
+
+/** A rule implements a non-trivial filter */
+typedef struct ecs_rule_t ecs_rule_t;
 
 /** A trigger reacts to events matching a single filter term */
 typedef struct ecs_trigger_t ecs_trigger_t;
@@ -2747,6 +2752,15 @@ FLECS_API
 bool ecs_term_is_set(
     const ecs_term_t *term);
 
+/** Test whether term id is set.
+ *
+ * @param id The term id.
+ * @return True when set, false when not set.
+ */
+FLECS_API
+bool ecs_term_id_is_set(
+    const ecs_term_id_t *id);
+
 /** Test whether a term is a trivial term.
  * A trivial term is a term that only contains a type id. Trivial terms must not
  * have read/write annotations, relation substitutions and subjects other than
@@ -3902,6 +3916,12 @@ bool ecs_commit(
 #endif
 #ifdef FLECS_STATS
 #include "flecs/addons/stats.h"
+#endif
+#ifdef FLECS_RULES
+#include "flecs/addons/rules.h"
+#endif
+#ifdef FLECS_PLECS
+#include "flecs/addons/plecs.h"
 #endif
 
 #ifdef __cplusplus

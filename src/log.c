@@ -1,6 +1,5 @@
 #include "private_api.h"
 
-static
 char *ecs_vasprintf(
     const char *fmt,
     va_list args)
@@ -266,16 +265,14 @@ void ecs_tracing_enable(
     trace_level = level;
 }
 
-void _ecs_parser_error(
+void _ecs_parser_errorv(
     const char *name,
     const char *expr, 
     int64_t column,
     const char *fmt,
-    ...)
+    va_list valist)
 {
     if (trace_level >= -2) {
-        va_list valist;
-        va_start(valist, fmt);
         char *msg = ecs_vasprintf(fmt, valist);
 
         if (column != -1) {
@@ -304,6 +301,19 @@ void _ecs_parser_error(
     }
 
     ecs_os_abort();
+}
+
+void _ecs_parser_error(
+    const char *name,
+    const char *expr, 
+    int64_t column,
+    const char *fmt,
+    ...)
+{
+    va_list valist;
+    va_start(valist, fmt);
+    _ecs_parser_errorv(name, expr, column, fmt, valist);
+    va_end(valist);
 }
 
 void _ecs_abort(

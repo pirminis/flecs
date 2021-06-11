@@ -1,8 +1,7 @@
 
 #include "private_api.h"
 
-static
-bool term_id_is_set(
+bool ecs_term_id_is_set(
     const ecs_term_id_t *id)
 {
     return id->entity != 0 || id->name != NULL;
@@ -163,7 +162,7 @@ bool ecs_id_match(
 bool ecs_term_is_set(
     const ecs_term_t *term)
 {
-    return term->id != 0 || term_id_is_set(&term->pred);
+    return term->id != 0 || ecs_term_id_is_set(&term->pred);
 }
 
 bool ecs_term_is_trivial(
@@ -495,31 +494,31 @@ char* ecs_filter_str(
             ecs_strbuf_appendstr(&buf, "?");
         }
 
-        if (term->args[0].entity == EcsThis && term_id_is_set(&term->args[1])) {
+        if (term->args[0].entity == EcsThis && ecs_term_id_is_set(&term->args[1])) {
             ecs_strbuf_appendstr(&buf, "(");
         }
 
-        if (!term_id_is_set(&term->args[1]) && 
+        if (!ecs_term_id_is_set(&term->args[1]) && 
             (term->pred.entity != term->args[0].entity)) 
         {
             filter_str_add_id(world, &buf, &term->pred);
 
-            if (!term_id_is_set(&term->args[0])) {
+            if (!ecs_term_id_is_set(&term->args[0])) {
                 ecs_strbuf_appendstr(&buf, "()");
             } else if (term->args[0].entity != EcsThis) {
                 ecs_strbuf_appendstr(&buf, "(");
                 filter_str_add_id(world, &buf, &term->args[0]);
             }
 
-            if (term_id_is_set(&term->args[1])) {
+            if (ecs_term_id_is_set(&term->args[1])) {
                 ecs_strbuf_appendstr(&buf, ", ");
                 filter_str_add_id(world, &buf, &term->args[1]);
                 ecs_strbuf_appendstr(&buf, ")");
             }
-        } else if (!term_id_is_set(&term->args[1])) {
+        } else if (!ecs_term_id_is_set(&term->args[1])) {
             ecs_strbuf_appendstr(&buf, "$");
             filter_str_add_id(world, &buf, &term->pred);
-        } else if (term_id_is_set(&term->args[1])) {
+        } else if (ecs_term_id_is_set(&term->args[1])) {
             filter_str_add_id(world, &buf, &term->pred);
             ecs_strbuf_appendstr(&buf, ", ");
             filter_str_add_id(world, &buf, &term->args[1]);

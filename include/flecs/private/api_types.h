@@ -87,6 +87,7 @@ typedef struct ecs_iter_table_t {
     ecs_entity_t *components; /**< Components in current table */
     ecs_type_t *types;        /**< Components in current table */
     ecs_ref_t *references;    /**< References to entities (from query) */
+    ecs_entity_t *sources;    /**< Source identifiers */
 } ecs_iter_table_t;
 
 /** Scope-iterator specific data */
@@ -130,6 +131,22 @@ typedef struct ecs_snapshot_iter_t {
     ecs_iter_table_t table;
 } ecs_snapshot_iter_t;  
 
+/** Rule-iterator specific data */
+typedef struct ecs_rule_iter_t {
+    const ecs_rule_t *rule;
+    struct ecs_rule_reg_t *registers;    /**< Variable storage */
+    struct ecs_rule_op_ctx_t *op_ctx;    /**< Operation-specific state */
+    int32_t *columns;                    /**< Table column indices */
+    ecs_entity_t *sources;               /**< Term sources */
+    
+    ecs_iter_table_t table;              /**< Result in case of table */
+    ecs_entity_t entity;                 /**< Result in case of 1 entity */
+    
+    bool redo;
+    int8_t op;
+    int8_t sp;
+} ecs_rule_iter_t;
+
 /** The ecs_iter_t struct allows applications to iterate tables.
  * Queries and filters, among others, allow an application to iterate entities
  * that match a certain set of components. Because of how data is stored 
@@ -172,6 +189,7 @@ struct ecs_iter_t {
         ecs_filter_iter_t filter;
         ecs_query_iter_t query;
         ecs_snapshot_iter_t snapshot;
+        ecs_rule_iter_t rule;
     } iter;                       /**< Iterator specific data */
 };
 

@@ -622,6 +622,11 @@ ecs_size_t ecs_from_size_t(
 int32_t ecs_next_pow_of_2(
     int32_t n);
 
+/* Allocate string from format & argument list */
+char *ecs_vasprintf(
+    const char *fmt,
+    va_list args);
+
 /* Convert 64bit value to ecs_record_t type. ecs_record_t is stored as 64bit int in the
  * entity index */
 ecs_record_t ecs_to_row(
