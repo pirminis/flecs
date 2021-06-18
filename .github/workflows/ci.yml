@@ -112,7 +112,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+<<<<<<< HEAD
       - name: install bake
+=======
+      - name: Install gcc
+        run: |
+          sudo apt-get install -y gcc-${{ matrix.compiler-version }}
+          sudo apt-get install -y g++-${{ matrix.compiler-version }}
+      
+      - name: Install bake
+>>>>>>> bd4b4801... Update ci.yml
         run: |
           git clone https://github.com/SanderMertens/bake
           make -C bake/build-$(uname)
@@ -132,8 +141,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+<<<<<<< HEAD
       - uses: ilammy/msvc-dev-cmd@v1
       - name: install bake
+=======
+      - name: Install clang
+        run: |
+          sudo apt-get install -y clang-${{ matrix.compiler-version }}
+          sudo apt-get install -y clang++-${{ matrix.compiler-version }}      
+      
+      - name: Install bake
+>>>>>>> bd4b4801... Update ci.yml
         run: |
           git clone https://github.com/SanderMertens/bake
           cd bake\build-Windows
