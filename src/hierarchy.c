@@ -16,7 +16,7 @@ bool path_append(
 
     ecs_type_t type = ecs_get_type(world, child);
     ecs_entity_t cur;
-    ecs_type_find_id(world, type, component, EcsChildOf, 1, 0, &cur);
+    ecs_type_find_id(world, type, 0, component, EcsChildOf, 1, 0, &cur);
     
     if (cur) {
         cur = ecs_get_alive(world, cur);
@@ -474,10 +474,9 @@ ecs_iter_t ecs_scope_iter_w_filter(
 
     ecs_id_record_t *r = ecs_get_id_record(world, ecs_pair(EcsChildOf, parent));
     if (r && r->table_index) {
-        it.iter.parent.tables = ecs_map_iter(r->table_index);
-        it.table_count = ecs_map_count(r->table_index);
+        it.private.iter.parent.tables = ecs_map_iter(r->table_index);
         if (filter) {
-            it.iter.parent.filter = *filter;
+            it.private.iter.parent.filter = *filter;
         }
     }
 
@@ -494,7 +493,7 @@ ecs_iter_t ecs_scope_iter(
 bool ecs_scope_next(
     ecs_iter_t *it)
 {
-    ecs_scope_iter_t *iter = &it->iter.parent;
+    ecs_scope_iter_t *iter = &it->private.iter.parent;
     ecs_map_iter_t *tables = &iter->tables;
     ecs_filter_t filter = iter->filter;
     ecs_table_record_t *tr;
@@ -520,9 +519,7 @@ bool ecs_scope_next(
             }
         }
 
-        iter->table.table = table;
-        it->table = &iter->table;
-        it->table_columns = data->columns;
+        it->table = table;
         it->count = ecs_table_count(table);
         it->entities = ecs_vector_first(data->entities, ecs_entity_t);
 

@@ -172,9 +172,9 @@ typedef int32_t ecs_size_t;
 #endif
 
 #if defined(__GNUC__)
-#define ECS_UNUSED(v) __attribute__((unused)) v
+#define ECS_UNUSED __attribute__((unused))
 #else
-#define ECS_UNUSED(v) (void)v
+#define ECS_UNUSED
 #endif
 
 #ifndef FLECS_NO_DEPRECATED_WARNINGS
@@ -2004,11 +2004,14 @@ typedef enum ecs_match_kind_t {
 struct ecs_filter_t {
     ecs_term_t *terms;         /* Array containing terms for filter */
     int32_t term_count;        /* Number of elements in terms array */
-
     int32_t term_count_actual; /* Processed count, which folds OR terms */
     
     char *name;                /* Name of filter (optional) */
     char *expr;                /* Expression of filter (if provided) */
+
+    bool match_this;           /* True if filter has terms with This subjects */
+    bool match_only_this;      /* True if filter only has terms with This 
+                                * subjects without substitution */
 
     /* Deprecated fields */
     ecs_type_t include;
@@ -2147,43 +2150,41 @@ typedef struct ecs_page_iter_t {
     int32_t remaining;
 } ecs_page_iter_t;
 
-/** Table specific data for iterators */
-typedef struct ecs_iter_table_t {
-    int32_t *columns;         /**< Mapping from query terms to table columns */
-    ecs_table_t *table;       /**< The current table. */
-    ecs_data_t *data;         /**< Table component data */
-    ecs_entity_t *components; /**< Components in current table */
-    ecs_type_t *types;        /**< Components in current table */
-    ecs_ref_t *references;    /**< References to entities (from query) */
-} ecs_iter_table_t;
-
 /** Scope-iterator specific data */
 typedef struct ecs_scope_iter_t {
     ecs_filter_t filter;
     ecs_map_iter_t tables;
     int32_t index;
-    ecs_iter_table_t table;
 } ecs_scope_iter_t;
+
+typedef enum ecs_filter_iter_kind_t {
+    EcsFilterIterEvalAll,
+    EcsFilterIterEvalIndex,
+    EcsFilterIterEvalNone,
+    EcsFilterIterNoData
+} ecs_filter_iter_kind_t;
 
 /** Filter-iterator specific data */
 typedef struct ecs_filter_iter_t {
-    ecs_filter_t filter;
-    ecs_sparse_t *tables;
-    int32_t index;
-    ecs_iter_table_t table;
-} ecs_filter_iter_t;
+    const ecs_filter_t *filter;
+    ecs_filter_iter_kind_t kind;
 
-/** Iterator flags used to quickly select the optimal iterator algorithm */
-typedef enum ecs_query_iter_kind_t {
-    EcsQuerySimpleIter,     /**< No paging, sorting or sparse columns */
-    EcsQueryPagedIter,      /**< Regular iterator with paging */
-    EcsQuerySortedIter,     /**< Sorted iterator */
-    EcsQuerySwitchIter      /**< Switch type iterator */
-} ecs_query_iter_kind_t;
+    /* For EcsFilterIterEvalIndex */ 
+    ecs_map_t *table_index;
+    ecs_map_t *substitution_index;
+    ecs_map_iter_t table_index_iter;
+    int32_t table_index_term;
+
+    /* For EcsFilterIterEvalAll */
+    ecs_sparse_t *tables;
+    int32_t tables_iter;
+    int32_t count;
+} ecs_filter_iter_t;
 
 /** Query-iterator specific data */
 typedef struct ecs_query_iter_t {
     ecs_page_iter_t page_iter;
+    ecs_query_t *query;
     int32_t index;
     int32_t sparse_smallest;
     int32_t sparse_first;
@@ -2195,53 +2196,30 @@ typedef struct ecs_snapshot_iter_t {
     ecs_filter_t filter;
     ecs_vector_t *tables; /* ecs_table_leaf_t */
     int32_t index;
-    ecs_iter_table_t table;
-} ecs_snapshot_iter_t;  
+} ecs_snapshot_iter_t;
 
-/** The ecs_iter_t struct allows applications to iterate tables.
- * Queries and filters, among others, allow an application to iterate entities
- * that match a certain set of components. Because of how data is stored 
- * internally, entities with a given set of components may be stored in multiple
- * consecutive arrays, stored across multiple tables. The ecs_iter_t type 
- * enables iteration across tables. */
-struct ecs_iter_t {
-    ecs_world_t *world;           /**< The world */
-    ecs_world_t *real_world;      /**< Actual world. This differs from world when using threads.  */
-    ecs_entity_t system;          /**< The current system (if applicable) */
-    ecs_entity_t event;           /**< The event (if applicable) */
-    ecs_query_iter_kind_t kind;
+/* Number of terms for which iterator can store data without allocations */
+#define ECS_ITER_TERM_STORAGE_SIZE (8)
 
-    ecs_iter_table_t *table;      /**< Table related data */
-    ecs_query_t *query;           /**< Current query being evaluated */
-    int32_t table_count;          /**< Active table count for query */
-    int32_t inactive_table_count; /**< Inactive table count for query */
-    int32_t column_count;         /**< Number of columns for system */
-    
-    void *table_columns;          /**< Table component data */
-    ecs_entity_t *entities;       /**< Entity identifiers */
-
-    void *param;                  /**< Param passed to ecs_run */
-    void *ctx;                    /**< System context */
-    void *binding_ctx;            /**< Binding context */
-    FLECS_FLOAT delta_time;       /**< Time elapsed since last frame */
-    FLECS_FLOAT delta_system_time;/**< Time elapsed since last system invocation */
-    FLECS_FLOAT world_time;       /**< Time elapsed since start of simulation */
-
-    int32_t frame_offset;         /**< Offset relative to frame */
-    int32_t offset;               /**< Offset relative to current table */
-    int32_t count;                /**< Number of entities to process by system */
-    int32_t total_count;          /**< Total number of entities in table */
-
-    ecs_ids_t *triggered_by; /**< Component(s) that triggered the system */
-    ecs_entity_t interrupted_by;  /**< When set, system execution is interrupted */
+typedef struct ecs_iter_private_t {
+    int32_t frame_offset;
+    int32_t total_count;
 
     union {
         ecs_scope_iter_t parent;
         ecs_filter_iter_t filter;
         ecs_query_iter_t query;
         ecs_snapshot_iter_t snapshot;
-    } iter;                       /**< Iterator specific data */
-};
+    } iter;
+
+    /* Arrays for avoiding allocations below ITER_TERM_STORAGE_SIZE terms */
+    ecs_id_t ids_storage[ECS_ITER_TERM_STORAGE_SIZE];
+    ecs_entity_t subjects_storage[ECS_ITER_TERM_STORAGE_SIZE];
+    ecs_size_t sizes_storage[ECS_ITER_TERM_STORAGE_SIZE];
+    ecs_type_t types_storage[ECS_ITER_TERM_STORAGE_SIZE];
+    int32_t type_map_storage[ECS_ITER_TERM_STORAGE_SIZE];
+    void *columns_storage[ECS_ITER_TERM_STORAGE_SIZE];
+} ecs_iter_private_t;
 
 typedef enum EcsMatchFailureReason {
     EcsMatchOk,
@@ -2738,9 +2716,10 @@ bool ecs_type_owns_type(
     bool owned);
 
 FLECS_API
-bool ecs_type_find_id(
+int32_t ecs_type_find_id(
     const ecs_world_t *world,
     ecs_type_t type,
+    int32_t offset,
     ecs_entity_t id,
     ecs_entity_t rel,
     int32_t min_depth,
@@ -3021,6 +3000,134 @@ typedef struct EcsQuery {
  * @defgroup misc_types Miscalleneous types
  * @{
  */
+
+/** Iterator.
+ * Contains all data necessary to iterate entities and component data. Iterators
+ * can be used without knowledge about the components being iterated. This makes 
+ * it possible for code like serializers and language bindings to inspect them.
+ *
+ * Each iterable object in flecs has an "iter" and a "next" function that are 
+ * used to obtain an iterator and iterate through the results. For example:
+ *
+ *   ecs_query_t *q = ...;
+ *  
+ *   // Create iterator
+ *   ecs_iter_t it = ecs_query_iter(q);
+ *  
+ *   // Iterate results
+ *   while (ecs_query_next(&it)) { }
+ *
+ * For each time the "next" function returns true, there are "count" entities to
+ * iterate, with the entity ids stored in the "entities" array:
+ *
+ *   while (ecs_query_next(&it)) { 
+ *     for (int i = 0; i < it.count; i ++) {
+ *       printf("entity matched: %u\n", it.entities[i]);
+ *     }
+ *   }
+ *
+ *
+ * It is guaranteed that each entity returned by a single "next" call has the
+ * same components. The type of the current batch of entities is accessible
+ * through the "type" member.
+ *
+ * Component data is accessible through the "columns" member which contains an
+ * array where each element stores the component data for a query term. For
+ * example, the following expression accesses a component value for the 2nd 
+ * term, 10th entity of type "Position": ((Position*)it.columns[1])[9];
+ *
+ * For convenience and safety checking applications should use ecs_term():
+ *
+ *   Position *p = ecs_term(&it, Position, 2);
+ * 
+ * Note that the term is here provided as 2. This is because ecs_term starts
+ * counting from 1 (the reason for this is that previous versions of Flecs
+ * stored entity ids as a component array at index 0).
+ *
+ * This shows a typical example of iterating two components:
+ *
+ *   while (ecs_query_next(&it)) { 
+ *     Position *p = ecs_term(&it, Position, 1);
+ *     Velocity *v = ecs_term(&it, Velocity, 2);
+ *  
+ *     for (int i = 0; i < it.count; i ++) {
+ *       p[i].x += v[i].x;
+ *       p[i].y += v[i].y;
+ *     }
+ *   }
+ *
+ * The above applies to any term that has a "This" subject, where a subject is
+ * the entity on which the component is matched, and "This" is the entity being
+ * matched by the query. This query has both "This" and non-"This" terms:
+ *
+ *   Position, Velocity(This), MaxSpeed(Game)
+ * 
+ * Here only the 1st and 2nd terms are "This" terms: the subject of the 3rd term
+ * is "Game". This means "MaxSpeed" will be retrieved from the "Game" entity.
+ *
+ * When a term contains data from a non-"This" term, it is not accessed as an
+ * array but as a pointer (or as an array with a single element), as this
+ * example shows:
+ *
+ *   while (ecs_query_next(&it)) { 
+ *     Position *p = ecs_term(&it, Position, 1);
+ *     Velocity *v = ecs_term(&it, Velocity, 2);
+ *     MaxSpeed *s = ecs_term(&it, MaxSpeed, 3);
+ *  
+ *     for (int i = 0; i < it.count; i ++) {
+ *       p[i].x += max(v[i].x, s->value);
+ *       p[i].y += max(v[i].y, s->value);
+ *     }
+ *   }
+ *
+ * Other examples of non-"This" terms are terms with substitutions, or 
+ * singletons. The following examples are all non-"This" terms:
+ *
+ *   $Position
+ *   Position(Game)
+ *   Position(superset)
+ *   Likes(Alice, *)
+ */
+struct ecs_iter_t {
+    ecs_entity_t *entities;  /* Entity ids for current table. Size: count */
+    int32_t count;           /* Number of entities to iterate for current table */
+    int32_t offset;          /* Offset from where to start iterating */
+    void **columns;          /* Component data. Size: term_count_actual */
+    int32_t *type_map;       /* Maps terms to indices in the type. Size: term_count_actual */
+
+    ecs_table_t *table;      /* Table being evaluated */
+    ecs_type_t type;         /* Type of entity/entities being evaluated */
+    ecs_term_t *terms;       /* Terms of current query. Size: term_count */
+
+    ecs_id_t *ids;           /* Component ids. Size: term_count_actual */
+    ecs_entity_t *subjects;  /* Subjects of terms, 0 for "This" terms. Size: term_count_actual */
+    size_t *sizes;           /* Component sizes. Size: term_count_actual */
+    ecs_type_t *types;       /* Components as types. Size: term_count_actual */
+
+    ecs_world_t *world;      /* The world. May point to a stage when in readonly mode. */
+    ecs_world_t *real_world; /* Always points to the actual world. */
+
+    int32_t term_count;      /* Number of elements in the terms array */
+    int32_t term_count_actual; /* Number of elements in the result arrays. This
+                                * number differs from term_count when the query
+                                * contains Or terms, as multiple Or terms get
+                                * folded into a single result term. */
+    
+    ecs_entity_t system;     /* The system, trigger or observer */
+    ecs_entity_t event;      /* The triggering event, if applicable */
+
+    void *param;             /* Param passed to ecs_run */
+    void *ctx;               /* System/trigger/observer context */
+    void *binding_ctx;       /* Binding context (for language bindings) */
+
+    FLECS_FLOAT delta_time;        /* Time elapsed since last frame */
+    FLECS_FLOAT delta_system_time; /* Time elapsed since last system invocation */
+    FLECS_FLOAT world_time;        /* Time elapsed since start of simulation */
+
+    ecs_entity_t interrupted_by;  /* When set, system execution is interrupted */
+
+    ecs_iter_private_t private;   /* Private iterator data */
+};
 
 /** Type that contains information about the world. */
 typedef struct ecs_world_info_t {
@@ -3510,7 +3617,7 @@ void *ecs_element_w_size(
 #define ecs_element(it, type, column, row)\
     ((type*)ecs_element_w_size(it, sizeof(type), column, row))
 
-ECS_DEPRECATED("use ecs_term_source")
+ECS_DEPRECATED("use ecs_term_subject")
 FLECS_API
 ecs_entity_t ecs_column_source(
     const ecs_iter_t *it,
@@ -5218,16 +5325,43 @@ ecs_type_t ecs_get_type(
     const ecs_world_t *world,
     ecs_entity_t entity);
 
-/** Get the typeid of an entity.
+/** Get the typeid of an id.
+ * If the provided id is regular component, the result of this operation will be
+ * the component itself. If the provided id is an entity that is not a component
+ * the operation will return 0.
+ *
+ * If the provided id is a pair, the operation will:
+ * - return the relation if it is a component, or
+ * - return the object if it is a component, or
+ * - return 0
+ *
+ * If the provided id has a role set other than ECS_PAIR, the operation will
+ * return 0.
  *
  * @param world The world.
- * @param entity The entity.
- * @return The typeid of the entity.
+ * @param id The id.
+ * @return The id of the corresponding component.
  */
 FLECS_API
 ecs_entity_t ecs_get_typeid(
     const ecs_world_t *world,
-    ecs_id_t e);
+    ecs_id_t id);
+
+/** Get the Component component of an entity.
+ * This operation behaves as the following statement:
+ *  ecs_get(world, ecs_get_type_id(world, id), EcsComponent);
+ *
+ * If the ecs_get_typeid operation would return 0 for the provided id, this
+ * operation will return NULL.
+ *
+ * @param world The world.
+ * @param entity The entity.
+ * @return A pointer to the Component component.
+ */
+FLECS_API
+const EcsComponent* ecs_get_component(
+    const ecs_world_t *world,
+    ecs_entity_t e);    
 
 /** Get the name of an entity.
  * This will return the name as specified in the EcsName component.
@@ -6321,7 +6455,7 @@ ecs_id_t ecs_term_id(
  * @return The source associated with te term.
  */
 FLECS_API
-ecs_entity_t ecs_term_source(
+ecs_entity_t ecs_term_subject(
     const ecs_iter_t *it,
     int32_t index);
 
@@ -17140,7 +17274,7 @@ inline flecs::entity iter::entity(size_t row) const {
 /* Obtain column source (0 if self) */
 template <typename Base>
 inline flecs::entity iter_deprecated<Base>::column_source(int32_t col) const {
-    return flecs::entity(iter()->world, ecs_term_source(iter(), col));
+    return flecs::entity(iter()->world, ecs_term_subject(iter(), col));
 }
 
 /* Obtain component/tag entity of column */
@@ -17167,7 +17301,7 @@ inline column<T>::column(iter &iter, int32_t index) {
 }
 
 inline flecs::entity iter::term_source(int32_t index) const {
-    return flecs::entity(m_iter->world, ecs_term_source(m_iter, index));
+    return flecs::entity(m_iter->world, ecs_term_subject(m_iter, index));
 }
 
 inline flecs::entity iter::term_id(int32_t index) const {

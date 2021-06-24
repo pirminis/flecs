@@ -111,7 +111,7 @@ ecs_snapshot_t* snapshot_create(
 
     /* Iterate tables in iterator */
     while (next(iter)) {
-        ecs_table_t *t = iter->table->table;
+        ecs_table_t *t = iter->table;
 
         if (t->flags & EcsTableHasBuiltins) {
             continue;
@@ -232,9 +232,8 @@ void ecs_snapshot_restore(
                 data = ecs_table_merge(world, table, table, data, leaf->data);
 
                 /* Run OnSet systems for merged entities */
-                ecs_ids_t components = ecs_type_to_entities(table->type);
-                ecs_run_set_systems(world, &components, table, data,
-                    old_count, new_count, true);
+                ecs_notify(
+                    world, table, data, old_count, new_count, EcsOnSet, NULL);
 
                 ecs_os_free(leaf->data->columns);
             } else {
@@ -269,13 +268,11 @@ void ecs_snapshot_restore(
             if (table->flags & EcsTableHasBuiltins) {
                 continue;
             }
-
-            ecs_ids_t components = ecs_type_to_entities(table->type);
+            
             ecs_data_t *table_data = ecs_table_get_data(table);
             int32_t entity_count = ecs_table_data_count(table_data);
-
-            ecs_run_set_systems(world, &components, table, 
-                table_data, 0, entity_count, true);            
+            ecs_notify(
+                world, table, table_data, 0, entity_count, EcsOnSet, NULL);         
         }
     }
 
@@ -296,15 +293,14 @@ ecs_iter_t ecs_snapshot_iter(
 
     return (ecs_iter_t){
         .world = snapshot->world,
-        .table_count = ecs_vector_count(snapshot->tables),
-        .iter.snapshot = iter
+        .private.iter.snapshot = iter
     };
 }
 
 bool ecs_snapshot_next(
     ecs_iter_t *it)
 {
-    ecs_snapshot_iter_t *iter = &it->iter.snapshot;
+    ecs_snapshot_iter_t *iter = &it->private.iter.snapshot;
     ecs_table_leaf_t *tables = ecs_vector_first(iter->tables, ecs_table_leaf_t);
     int32_t count = ecs_vector_count(iter->tables);
     int32_t i;
@@ -322,9 +318,7 @@ bool ecs_snapshot_next(
             continue;
         }
 
-        iter->table.table = table;
-        it->table = &iter->table;
-        it->table_columns = data->columns;
+        it->table = table;
         it->count = ecs_table_data_count(data);
         it->entities = ecs_vector_first(data->entities, ecs_entity_t);
         iter->index = i + 1;

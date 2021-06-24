@@ -24,7 +24,6 @@ void ecs_dbg_table(
     *dbg_out = (ecs_dbg_table_t){.table = table};
 
     dbg_out->type = table->type;
-    dbg_out->systems_matched = table->queries;
 
     /* Determine components from parent/base entities */
     ecs_entity_t *entities = ecs_vector_first(table->type, ecs_entity_t);

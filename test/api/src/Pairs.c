@@ -1571,7 +1571,7 @@ void Pairs_dsl_pair_w_explicit_subj() {
     test_int(it.count, 1);
     test_int(it.entities[0], e4);
     test_int(ecs_term_id(&it, 1), ecs_pair(Rel, Obj));
-    test_int(ecs_term_source(&it, 1), Subj);
+    test_int(ecs_term_subject(&it, 1), Subj);
 
     test_bool(ecs_query_next(&it), false); 
 
@@ -1858,7 +1858,7 @@ void Pairs_api_pair_w_explicit_subj() {
     test_int(it.count, 1);
     test_int(it.entities[0], e4);
     test_int(ecs_term_id(&it, 1), ecs_pair(Rel, Obj));
-    test_int(ecs_term_source(&it, 1), Subj);
+    test_int(ecs_term_subject(&it, 1), Subj);
 
     test_bool(ecs_query_next(&it), false); 
 

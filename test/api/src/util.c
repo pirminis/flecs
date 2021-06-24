@@ -17,7 +17,7 @@ void probe_system_w_ctx(
     int i;
     for (i = 0; i < ctx->column_count; i ++) {
         ctx->c[ctx->invoked][i] = it->table->components[i];
-        ctx->s[ctx->invoked][i] = ecs_term_source(it, i + 1);
+        ctx->s[ctx->invoked][i] = ecs_term_subject(it, i + 1);
 
         /* Make sure ecs_term functions work */
         ecs_type_t t = ecs_column_type(it, i + 1);

@@ -42,45 +42,6 @@ ecs_hashmap_t ecs_table_hashmap_new(void) {
     return ecs_hashmap_new(ecs_ids_t, ecs_table_t*, ids_hash, ids_compare);
 }
 
-const EcsComponent* ecs_component_from_id(
-    const ecs_world_t *world,
-    ecs_entity_t e)
-{
-    ecs_entity_t pair = 0;
-
-    /* If this is a pair, get the pair component from the identifier */
-    if (ECS_HAS_ROLE(e, PAIR)) {
-        pair = e;
-        e = ecs_get_alive(world, ECS_PAIR_RELATION(e));
-
-        if (ecs_has_id(world, e, EcsTag)) {
-            return NULL;
-        }
-    }
-
-    if (e & ECS_ROLE_MASK) {
-        return NULL;
-    }
-
-    const EcsComponent *component = ecs_get(world, e, EcsComponent);
-    if ((!component || !component->size) && pair) {
-        /* If this is a pair column and the pair is not a component, use
-         * the component type of the component the pair is applied to. */
-        e = ECS_PAIR_OBJECT(pair);
-
-        /* Because generations are not stored in the pair, get the currently
-         * alive id */
-        e = ecs_get_alive(world, e);
-
-        /* If a pair is used with a not alive id, the pair is not valid */
-        ecs_assert(e != 0, ECS_INTERNAL_ERROR, NULL);
-
-        component = ecs_get(world, e, EcsComponent);
-    }
-
-    return component;
-}
-
 /* Count number of columns with data (excluding tags) */
 static
 int32_t data_column_count(
@@ -98,7 +59,7 @@ int32_t data_column_count(
          * doesn't work during bootstrap. */
         if ((component == ecs_id(EcsComponent)) || 
             (component == ecs_id(EcsName)) || 
-            ecs_component_from_id(world, component) != NULL) 
+            ecs_get_component(world, component) != NULL) 
         {
             count = c_ptr_i + 1;
         }
@@ -305,18 +266,12 @@ void init_table(
     table->data = NULL;
     table->flags = 0;
     table->dirty_state = NULL;
-    table->monitors = NULL;
-    table->on_set = NULL;
-    table->on_set_all = NULL;
-    table->on_set_override = NULL;
-    table->un_set_all = NULL;
     table->alloc_count = 0;
     table->lock = 0;
 
     /* Ensure the component ids for the table exist */
     ensure_columns(world, table);
 
-    table->queries = NULL;
     table->column_count = data_column_count(world, table);
     table->sw_column_count = switch_column_count(table);
     table->bs_column_count = bitset_column_count(table);

@@ -315,7 +315,7 @@ ecs_entity_t ecs_run_intern(
     it.delta_time = delta_time;
     it.delta_system_time = time_elapsed;
     it.world_time = world->stats.world_time_total;
-    it.frame_offset = offset;
+    it.private.frame_offset = offset;
     it.param = param;
     it.ctx = system_data->ctx;
     it.binding_ctx = system_data->binding_ctx;
@@ -418,7 +418,6 @@ void ecs_run_monitor(
         monitor->matched_table_index, row, count);
 
     it.world = world;
-    it.triggered_by = components;
     it.ctx = system_data->ctx;
     it.binding_ctx = system_data->binding_ctx;
 

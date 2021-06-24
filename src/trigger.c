@@ -192,35 +192,36 @@ void notify_trigger_set(
     index ++;
 
     ecs_entity_t ids[1] = { id };
-    int32_t columns[1] = { index };
+    int32_t type_map[1] = { 0 };
+    void *columns[1] = { NULL };
+    size_t sizes[1] = { 0 };
 
     /* If there is no data, ensure that system won't try to get it */
     if (table->column_count < index) {
-        columns[0] = 0;
+        type_map[0] = -1;
     } else {
         ecs_column_t *column = &data->columns[index - 1];
         if (!column->size) {
-            columns[0] = 0;
+            type_map[0] = -1;
+        } else {
+            columns[0] = ecs_vector_first_t(
+                column->data, column->size, column->alignment);
+            sizes[0] = column->size;
         }
     }
 
     ecs_type_t types[1] = { ecs_type_from_id(world, id) };
 
-    ecs_iter_table_t table_data = {
-        .table = table,
-        .columns = columns,
-        .components = ids,
-        .types = types
-    };
-
     ecs_iter_t it = {
         .world = world,
         .event = event,
-        .table = &table_data,
-        .table_count = 1,
-        .inactive_table_count = 0,
-        .column_count = 1,
-        .table_columns = data->columns,
+        .table = table,
+        .ids = ids,
+        .type_map = type_map,
+        .columns = columns,
+        .sizes = sizes,
+        .types = types,
+        .term_count = 1,
         .entities = entities,
         .offset = row,
         .count = count

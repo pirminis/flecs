@@ -75,6 +75,15 @@ void ecs_unregister_name(
 //// World API
 ////////////////////////////////////////////////////////////////////////////////
 
+void ecs_notify(
+    ecs_world_t * world,
+    ecs_table_t * table,
+    ecs_data_t * data,
+    int32_t row,
+    int32_t count,
+    ecs_entity_t event,
+    ecs_ids_t *ids);
+
 /* Notify systems that there is a new table, which triggers matching */
 void ecs_notify_queries_of_table(
     ecs_world_t *world,
@@ -326,15 +335,6 @@ void ecs_run_remove_actions(
     int32_t count,
     ecs_ids_t *removed);
 
-void ecs_run_set_systems(
-    ecs_world_t *world,
-    ecs_ids_t *components,
-    ecs_table_t *table,
-    ecs_data_t *data,
-    int32_t row,
-    int32_t count,
-    bool set_all);
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Table API
@@ -358,18 +358,6 @@ ecs_data_t* ecs_init_data(
     ecs_world_t *world,
     ecs_table_t *table,
     ecs_data_t *result); 
-
-/* Activates / deactivates table for systems. A deactivated table will not be
- * evaluated when the system is invoked. Tables automatically get activated /
- * deactivated when they become non-empty / empty. 
- *
- * If a query is provided, the table will only be activated / deactivated for
- * that query. */
-void ecs_table_activate(
-    ecs_world_t *world,
-    ecs_table_t *table,
-    ecs_query_t *query,
-    bool activate);
 
 /* Clear all entities from a table. */
 void ecs_table_clear(
@@ -459,11 +447,6 @@ int32_t* ecs_table_get_monitor(
 void ecs_init_root_table(
     ecs_world_t *world);
 
-/* Unset components in table */
-void ecs_table_remove_actions(
-    ecs_world_t *world,
-    ecs_table_t *table);
-
 /* Free table */
 void ecs_table_free(
     ecs_world_t *world,
@@ -512,7 +495,7 @@ void ecs_table_mark_dirty(
     ecs_table_t *table,
     ecs_entity_t component);
 
-const EcsComponent* ecs_component_from_id(
+const EcsComponent* ecs_get_component(
     const ecs_world_t *world,
     ecs_entity_t e);
 
@@ -571,6 +554,40 @@ void ecs_query_notify(
     ecs_query_t *query,
     ecs_query_event_t *event);
 
+
+////////////////////////////////////////////////////////////////////////////////
+//// Filter API
+////////////////////////////////////////////////////////////////////////////////
+
+bool ecs_filter_populate_from_type(
+    ecs_world_t *world,
+    const ecs_filter_t *filter,
+    ecs_type_t type,
+    ecs_cached_type_t *matched,
+    bool first);
+
+void ecs_filter_populate_from_table(
+    ecs_world_t *world,
+    const ecs_filter_t *filter,
+    ecs_table_t *table,
+    ecs_cached_type_t *matched,
+    void **columns);
+
+
+////////////////////////////////////////////////////////////////////////////////
+//// Iter API
+////////////////////////////////////////////////////////////////////////////////
+
+void ecs_iter_init_from(
+    ecs_iter_t *dst, 
+    ecs_iter_t *src);
+
+void ecs_iter_init_from_cached_type(
+    ecs_iter_t *it, 
+    ecs_cached_type_t *type);
+
+void ecs_iter_init_from_storage(
+    ecs_iter_t *it);
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Time API

@@ -1475,7 +1475,7 @@ void Hierarchies_rematch_after_add_to_recycled_parent() {
     test_int(p->x, 10);
     test_int(p->y, 20);
 
-    test_assert(ecs_term_source(&it, 2) == parent);
+    test_assert(ecs_term_subject(&it, 2) == parent);
 
     ecs_fini(world);
 }
@@ -1514,21 +1514,21 @@ void Hierarchies_cascade_after_recycled_parent_change() {
     test_bool(ecs_query_next(&it), true);
     test_int(it.count, 1);
     test_assert(it.entities[0] == parent);
-    test_assert(ecs_term_source(&it, 2) == 0);
+    test_assert(ecs_term_subject(&it, 2) == 0);
     const Position *p = ecs_term(&it, Position, 2);
     test_assert(p == NULL);
 
     test_bool(ecs_query_next(&it), true);
     test_int(it.count, 1);
     test_assert(it.entities[0] == child);
-    test_assert(ecs_term_source(&it, 2) == 0);
+    test_assert(ecs_term_subject(&it, 2) == 0);
     p = ecs_term(&it, Position, 2);
     test_assert(p == NULL);
 
     test_bool(ecs_query_next(&it), true);
     test_int(it.count, 1);
     test_assert(it.entities[0] == e);
-    test_assert(ecs_term_source(&it, 2) == 0);
+    test_assert(ecs_term_subject(&it, 2) == 0);
     p = ecs_term(&it, Position, 2);
     test_assert(p == NULL);
 
@@ -1543,14 +1543,14 @@ void Hierarchies_cascade_after_recycled_parent_change() {
     test_bool(ecs_query_next(&it), true);
     test_int(it.count, 1);
     test_assert(it.entities[0] == parent);
-    test_assert(ecs_term_source(&it, 2) == 0);
+    test_assert(ecs_term_subject(&it, 2) == 0);
     p = ecs_term(&it, Position, 2);
     test_assert(p == NULL);
 
     test_bool(ecs_query_next(&it), true);
     test_int(it.count, 1);
     test_assert(it.entities[0] == child);
-    test_assert(ecs_term_source(&it, 2) == parent);
+    test_assert(ecs_term_subject(&it, 2) == parent);
     p = ecs_term(&it, Position, 2);
     test_assert(p != NULL);
     test_int(p->x, 10);
@@ -1559,7 +1559,7 @@ void Hierarchies_cascade_after_recycled_parent_change() {
     test_bool(ecs_query_next(&it), true);
     test_int(it.count, 1);
     test_assert(it.entities[0] == e);
-    test_assert(ecs_term_source(&it, 2) == child);
+    test_assert(ecs_term_subject(&it, 2) == child);
     p = ecs_term(&it, Position, 2);
     test_assert(p != NULL);
     test_int(p->x, 20);

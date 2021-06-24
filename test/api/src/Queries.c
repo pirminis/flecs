@@ -1184,7 +1184,7 @@ void Queries_only_from_entity() {
 
     it = ecs_query_iter(q);
     test_assert(ecs_query_next(&it));
-    test_assert(ecs_term_source(&it, 1) == e);
+    test_assert(ecs_term_subject(&it, 1) == e);
     test_assert(ecs_term_id(&it, 1) == Tag);
 
     ecs_fini(world);
@@ -1205,7 +1205,7 @@ void Queries_only_from_singleton() {
 
     it = ecs_query_iter(q);
     test_assert(ecs_query_next(&it));
-    test_assert(ecs_term_source(&it, 1) == e);
+    test_assert(ecs_term_subject(&it, 1) == e);
     test_assert(ecs_term_id(&it, 1) == e);
 
     ecs_fini(world);
@@ -1221,7 +1221,7 @@ void Queries_only_not_from_entity() {
     ecs_query_t *q = ecs_query_new(world, "!e:Tag");
     ecs_iter_t it = ecs_query_iter(q);
     test_assert(ecs_query_next(&it));
-    test_assert(ecs_term_source(&it, 1) == e);
+    test_assert(ecs_term_subject(&it, 1) == e);
     test_assert(ecs_term_id(&it, 1) == Tag);
 
     ecs_add(world, e, Tag);
@@ -1242,7 +1242,7 @@ void Queries_only_not_from_singleton() {
     ecs_query_t *q = ecs_query_new(world, "!$e");
     ecs_iter_t it = ecs_query_iter(q);
     test_assert(ecs_query_next(&it));
-    test_assert(ecs_term_source(&it, 1) == e);
+    test_assert(ecs_term_subject(&it, 1) == e);
     test_assert(ecs_term_id(&it, 1) == e);
 
     ecs_add_id(world, e, e);

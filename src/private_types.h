@@ -64,8 +64,6 @@ typedef struct ecs_type_info_t {
 
 /* Table event type for notifying tables of world events */
 typedef enum ecs_table_eventkind_t {
-    EcsTableQueryMatch,
-    EcsTableQueryUnmatch,
     EcsTableTriggerMatch,
     EcsTableComponentInfo
 } ecs_table_eventkind_t;
@@ -90,29 +88,29 @@ typedef struct ecs_table_event_t {
 
 /** A component column. */
 struct ecs_column_t {
-    ecs_vector_t *data;        /**< Column data */
-    int16_t size;              /**< Column element size */
-    int16_t alignment;         /**< Column element alignment */
+    ecs_vector_t *data;        /* Column data */
+    int16_t size;              /* Column element size */
+    int16_t alignment;         /* Column element alignment */
 };
 
 /** A switch column. */
 typedef struct ecs_sw_column_t {
-    ecs_switch_t *data;   /**< Column data */
-    ecs_type_t type;      /**< Switch type */
+    ecs_switch_t *data;   /* Column data */
+    ecs_type_t type;      /* Switch type */
 } ecs_sw_column_t;
 
 /** A bitset column. */
 typedef struct ecs_bs_column_t {
-    ecs_bitset_t data;   /**< Column data */
+    ecs_bitset_t data;   /* Column data */
 } ecs_bs_column_t;
 
 /** Stage-specific component data */
 struct ecs_data_t {
-    ecs_vector_t *entities;      /**< Entity identifiers */
-    ecs_vector_t *record_ptrs;   /**< Ptrs to records in main entity index */
-    ecs_column_t *columns;       /**< Component columns */
-    ecs_sw_column_t *sw_columns; /**< Switch columns */
-    ecs_bs_column_t *bs_columns; /**< Bitset columns */
+    ecs_vector_t *entities;      /* Entity identifiers */
+    ecs_vector_t *record_ptrs;   /* Ptrs to records in main entity index */
+    ecs_column_t *columns;       /* Component columns */
+    ecs_sw_column_t *sw_columns; /* Switch columns */
+    ecs_bs_column_t *bs_columns; /* Bitset columns */
 };
 
 /** Small footprint data structure for storing data associated with a table. */
@@ -123,13 +121,13 @@ typedef struct ecs_table_leaf_t {
 } ecs_table_leaf_t;
 
 /** Flags for quickly checking for special properties of a table. */
-#define EcsTableHasBuiltins         1u    /**< Does table have builtin components */
-#define EcsTableIsPrefab            2u    /**< Does the table store prefabs */
-#define EcsTableHasBase             4u    /**< Does the table type has IsA */
-#define EcsTableHasParent           8u    /**< Does the table type has ChildOf */
-#define EcsTableHasComponentData    16u   /**< Does the table have component data */
-#define EcsTableHasXor              32u   /**< Does the table type has XOR */
-#define EcsTableIsDisabled          64u   /**< Does the table type has EcsDisabled */
+#define EcsTableHasBuiltins         1u    /* Does table have builtin components */
+#define EcsTableIsPrefab            2u    /* Does the table store prefabs */
+#define EcsTableHasBase             4u    /* Does the table type has IsA */
+#define EcsTableHasParent           8u    /* Does the table type has ChildOf */
+#define EcsTableHasComponentData    16u   /* Does the table have component data */
+#define EcsTableHasXor              32u   /* Does the table type has XOR */
+#define EcsTableIsDisabled          64u   /* Does the table type has EcsDisabled */
 #define EcsTableHasCtors            128u
 #define EcsTableHasDtors            256u
 #define EcsTableHasCopy             512u
@@ -150,8 +148,8 @@ typedef struct ecs_table_leaf_t {
 
 /** Edge used for traversing the table graph. */
 typedef struct ecs_edge_t {
-    ecs_table_t *add;               /**< Edges traversed when adding */
-    ecs_table_t *remove;            /**< Edges traversed when removing */
+    ecs_table_t *add;               /* Edges traversed when adding */
+    ecs_table_t *remove;            /* Edges traversed when removing */
 } ecs_edge_t;
 
 /** Quey matched with table with backref to query table administration.
@@ -161,8 +159,8 @@ typedef struct ecs_edge_t {
  * fast lookup is required for the query administration, as is the case with
  * OnSet and Monitor systems. */
 typedef struct ecs_matched_query_t {
-    ecs_query_t *query;             /**< The query matched with the table */
-    int32_t matched_table_index;    /**< Table index in the query type */
+    ecs_query_t *query;             /* The query matched with the table */
+    int32_t matched_table_index;    /* Table index in the query type */
 } ecs_matched_query_t;
 
 /** A table is the Flecs equivalent of an archetype. Tables store all entities
@@ -170,27 +168,21 @@ typedef struct ecs_matched_query_t {
  * entity has a set of components not previously observed before. When a new
  * table is created, it is automatically matched with existing queries */
 struct ecs_table_t {
-    uint64_t id;                     /**< Table id in sparse set */
-    ecs_type_t type;                 /**< Identifies table type in type_index */
-    ecs_flags32_t flags;             /**< Flags for testing table properties */
-    int32_t column_count;            /**< Number of data columns in table */
+    ecs_type_t type;                 /* Identifies table type in type_index */
+    ecs_type_info_t **c_info;        /* Cached pointers to component info */
 
-    ecs_data_t *data;                /**< Component storage */
-    ecs_type_info_t **c_info;        /**< Cached pointers to component info */
-
-    ecs_edge_t *lo_edges;            /**< Edges to other tables */
+    ecs_edge_t *lo_edges;            /* Edges to other tables */
     ecs_map_t *hi_edges;
 
-    ecs_vector_t *queries;           /**< Queries matched with table */
-    ecs_vector_t *monitors;          /**< Monitor systems matched with table */
-    ecs_vector_t **on_set;           /**< OnSet systems, broken up by column */
-    ecs_vector_t *on_set_all;        /**< All OnSet systems */
-    ecs_vector_t *on_set_override;   /**< All OnSet systems with overrides */
-    ecs_vector_t *un_set_all;        /**< All UnSet systems */
+    ecs_data_t *data;                /* Component storage */
 
-    int32_t *dirty_state;            /**< Keep track of changes in columns */
-    int32_t alloc_count;             /**< Increases when columns are reallocd */
+    int32_t *dirty_state;            /* Keep track of changes in columns */
+    int32_t alloc_count;             /* Increases when columns are reallocd */
+    uint64_t id;                     /* Table id in sparse set */
 
+    ecs_flags32_t flags;             /* Flags for testing table properties */
+    
+    int32_t column_count;            /* Number of data columns in table */
     int32_t sw_column_count;
     int32_t sw_column_offset;
     int32_t bs_column_count;
@@ -212,14 +204,25 @@ typedef struct ecs_bitset_column_t {
     int32_t column_index;
 } ecs_bitset_column_t;
 
+/* Precomputed data for table in query cache */
+typedef struct ecs_cached_type_t {
+    ecs_id_t *ids;           /* Component ids. Size: term_count */
+    ecs_entity_t *subjects;  /* Subjects of terms, 0 for "This" terms. Size: term_count */
+    ecs_size_t *sizes;       /* Component sizes. Size: term_count */
+    ecs_type_t *types;       /* Components as types. Size: term_count */
+    int32_t *type_map;       /* Maps terms to indices in the type. Size: term_count */
+} ecs_cached_type_t;
+
 /** Type containing data for a table matched with a query. */
-typedef struct ecs_matched_table_t {
-    ecs_iter_table_t iter_data;    /**< Precomputed data for iterators */
-    ecs_vector_t *sparse_columns;  /**< Column ids of sparse columns */
-    ecs_vector_t *bitset_columns;  /**< Column ids with disabled flags */
-    int32_t *monitor;              /**< Used to monitor table for changes */
-    int32_t rank;                  /**< Rank used to sort tables */
-} ecs_matched_table_t;
+typedef struct ecs_cached_table_t {
+    ecs_table_t *table;
+    ecs_cached_type_t type;           /* Cached type data */
+    ecs_ref_t *references;            /* References to non-This components */
+    ecs_vector_t *sparse_columns;     /* Column ids of sparse columns */
+    ecs_vector_t *bitset_columns;     /* Column ids with disabled flags */
+    int32_t *monitor;                 /* Used to monitor table for changes */
+    int32_t rank;                     /* Rank used to sort tables */
+} ecs_cached_table_t;
 
 /** Type used to track location of table in queries' table lists.
  * When a table becomes empty or non-empty a signal is sent to a query, which
@@ -245,9 +248,9 @@ typedef struct ecs_table_indices_t {
  * when the query iterates over the archetypes, it only needs to iterate the
  * list of ranges. */
 typedef struct ecs_table_slice_t {
-    ecs_matched_table_t *table;     /**< Reference to the matched table */
-    int32_t start_row;              /**< Start of range  */
-    int32_t count;                  /**< Number of entities in range */
+    ecs_cached_table_t *table;     /* Reference to the matched table */
+    int32_t start_row;              /* Start of range  */
+    int32_t count;                  /* Number of entities in range */
 } ecs_table_slice_t;
 
 #define EcsQueryNeedsTables (1)      /* Query needs matching with tables */ 
@@ -283,13 +286,13 @@ typedef struct ecs_query_event_t {
 
 /** Query that is automatically matched against active tables */
 struct ecs_query_t {
-    /* Signature of query */
+    /* Query filter */
     ecs_filter_t filter;
 
     /* Reference to world */
     ecs_world_t *world;
 
-    /* Tables matched with query */
+    /* Table cache */
     ecs_vector_t *tables;
     ecs_vector_t *empty_tables;
     ecs_map_t *table_indices;
