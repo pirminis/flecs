@@ -106,11 +106,11 @@ void cached_type_copy(
     const ecs_cached_type_t *src,
     int32_t term_count)
 {
-    dst->ids = ecs_os_memdup(src->ids, term_count * sizeof(ecs_id_t));
-    dst->subjects = ecs_os_memdup(src->subjects, term_count * sizeof(ecs_entity_t));
-    dst->sizes = ecs_os_memdup(src->sizes, term_count * sizeof(ecs_size_t));
-    dst->types = ecs_os_memdup(src->types, term_count * sizeof(ecs_type_t));
-    dst->type_map = ecs_os_memdup(src->type_map, term_count * sizeof(int32_t));
+    dst->ids = ecs_os_memdup(src->ids, term_count * ECS_SIZEOF(ecs_id_t));
+    dst->subjects = ecs_os_memdup(src->subjects, term_count * ECS_SIZEOF(ecs_entity_t));
+    dst->sizes = ecs_os_memdup(src->sizes, term_count * ECS_SIZEOF(ecs_size_t));
+    dst->types = ecs_os_memdup(src->types, term_count * ECS_SIZEOF(ecs_type_t));
+    dst->type_map = ecs_os_memdup(src->type_map, term_count * ECS_SIZEOF(int32_t));
 }
 
 static
@@ -142,6 +142,7 @@ void insert_table(
     ecs_table_t *table,
     ecs_cached_type_t *cached_type)
 {
+    (void)world;
     ecs_vector_t **tables;
     int32_t index;
 
@@ -221,6 +222,8 @@ void clear_tables(
     ecs_world_t *world,
     ecs_query_t *query)
 {
+    (void)world;
+
     ecs_vector_each(query->empty_tables, ecs_cached_table_t, table, {
         cached_table_free(table);
     });
@@ -1199,6 +1202,9 @@ void remove_subquery(
 
 /* -- Private API -- */
 
+/* TODO: generalize notifications between queries/subqueries to emitting events
+ *       between observables */
+
 void ecs_query_notify(
     ecs_world_t *world,
     ecs_query_t *query,
@@ -1418,48 +1424,6 @@ ecs_iter_t ecs_query_iter(
     ecs_query_t *query)
 {
     return ecs_query_iter_page(query, 0, 0);
-}
-
-void ecs_query_set_iter(
-    ecs_world_t *world,
-    ecs_query_t *query,
-    ecs_iter_t *it,
-    int32_t table_index,
-    int32_t row,
-    int32_t count)
-{
-    (void)world;
-    
-    ecs_assert(query != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(!(query->flags & EcsQueryIsOrphaned), ECS_INVALID_PARAMETER, NULL);
-    
-    ecs_cached_table_t *table_data = ecs_vector_get(
-        query->tables, ecs_cached_table_t, table_index);
-    ecs_assert(table_data != NULL, ECS_INTERNAL_ERROR, NULL);
-
-    ecs_table_t *table = table_data->table;
-    ecs_data_t *data = ecs_table_get_data(table);
-    ecs_assert(data != NULL, ECS_INTERNAL_ERROR, NULL);
-
-    ecs_entity_t *entity_buffer = ecs_vector_first(data->entities, ecs_entity_t);  
-    it->entities = &entity_buffer[row];
-
-    it->world = NULL;
-    it->offset = row;
-    it->count = count;
-    it->term_count = query->filter.term_count;
-    it->term_count_actual = query->filter.term_count_actual;
-    it->terms = query->filter.terms;
-    it->private.total_count = count;
-
-    ecs_iter_init_from_cached_type(it, &table_data->type);
-
-    ecs_assert(it->term_count_actual < ECS_ITER_TERM_STORAGE_SIZE, 
-        ECS_UNSUPPORTED, NULL);
-    it->columns = it->private.columns_storage;
-
-    ecs_filter_populate_from_table(
-        world, &query->filter, table, &table_data->type, it->columns);
 }
 
 static
@@ -1937,7 +1901,7 @@ bool ecs_query_next(
 
         it->ids = type_data->ids;
         it->subjects = type_data->subjects;
-        it->sizes = (size_t*)type_data->sizes;
+        it->sizes = type_data->sizes;
         it->types = type_data->types;
         it->type_map = type_data->type_map;
 

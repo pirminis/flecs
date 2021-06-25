@@ -172,94 +172,272 @@ void init_edges(
     ecs_world_t * world,
     ecs_table_t * table)
 {
-    ecs_entity_t *entities = ecs_vector_first(table->type, ecs_entity_t);
+    ecs_id_t *ids = ecs_vector_first(table->type, ecs_id_t);
     int32_t count = ecs_vector_count(table->type);
 
     table->lo_edges = NULL;
     table->hi_edges = NULL;
     
-    /* Make add edges to own components point to self */
+    /* Iterate components for table, initialize edges that point to self */
     int32_t i;
     for (i = 0; i < count; i ++) {
-        ecs_entity_t e = entities[i];
+        ecs_id_t id = ids[i];
 
-        ecs_edge_t *edge = get_edge(table, e);
+        ecs_edge_t *edge = get_edge(table, id);
         ecs_assert(edge != NULL, ECS_INTERNAL_ERROR, NULL);
         edge->add = table;
 
+        /* If the table only has one component, we also know that all remove
+         * edges point to the root table (which has no components) */
         if (count == 1) {
             edge->remove = &world->store.root;
-        }
+        }       
+    }
+}
 
-        /* As we're iterating over the table components, also set the table
-         * flags. These allow us to quickly determine if the table contains
-         * data that needs to be handled in a special way, like prefabs or 
-         * containers */
-        if (e <= EcsLastInternalComponentId || e == EcsModule) {
+static
+void init_flags(
+    ecs_world_t * world,
+    ecs_table_t * table)
+{
+    ecs_id_t *ids = ecs_vector_first(table->type, ecs_id_t);
+    int32_t count = ecs_vector_count(table->type);
+    
+    /* Iterate components to initialize table flags */
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ecs_id_t id = ids[i];
+
+        /* Does table has builtin flecs objects, such as components, systems or
+         * modules. */
+        if (id <= EcsLastInternalComponentId || id == EcsModule) {
             table->flags |= EcsTableHasBuiltins;
         }
 
-        if (e == EcsPrefab) {
+        /* Mark table if it contains prefabs. Also mark it as disabled, so that
+         * they are skipped during query iteration. */
+        if (id == EcsPrefab) {
             table->flags |= EcsTableIsPrefab;
             table->flags |= EcsTableIsDisabled;
         }
 
-        if (e == EcsDisabled) {
+        /* If table contains disabled entities, mark it as disabled */
+        if (id == EcsDisabled) {
             table->flags |= EcsTableIsDisabled;
         }
 
-        if (e == ecs_id(EcsComponent)) {
-            table->flags |= EcsTableHasComponentData;
-        }
-
-        if (ECS_HAS_ROLE(e, XOR)) {
+        /* Does table have exclusive or columns */
+        if (ECS_HAS_ROLE(id, XOR)) {
             table->flags |= EcsTableHasXor;
         }
 
-        if (ECS_HAS_RELATION(e, EcsIsA)) {
-            table->flags |= EcsTableHasBase;
+        /* Does table have IsA relations */
+        if (ECS_HAS_RELATION(id, EcsIsA)) {
+            table->flags |= EcsTableHasIsA;
         }
 
-        if (ECS_HAS_ROLE(e, SWITCH)) {
+        /* Does table have switch columns */
+        if (ECS_HAS_ROLE(id, SWITCH)) {
             table->flags |= EcsTableHasSwitch;
         }
 
-        if (ECS_HAS_ROLE(e, DISABLED)) {
+        /* Does table support component disabling */
+        if (ECS_HAS_ROLE(id, DISABLED)) {
             table->flags |= EcsTableHasDisabled;
         }   
 
-        ecs_entity_t obj = 0;
-
-        if (ECS_HAS_RELATION(e, EcsChildOf)) {
-            obj = ecs_pair_object(world, e);
+        /* Does table have ChildOf relations */
+        if (ECS_HAS_RELATION(id, EcsChildOf)) {
+            ecs_entity_t obj = ecs_pair_object(world, id);
             if (obj == EcsFlecs || obj == EcsFlecsCore || 
                 ecs_has_id(world, obj, EcsModule)) 
             {
+                /* If table contains entities that are inside one of the builtin
+                 * modules, it contains builtin entities */
                 table->flags |= EcsTableHasBuiltins;
             }
-
-            e = ecs_pair(EcsChildOf, obj);
-            table->flags |= EcsTableHasParent;
-        }       
-
-        if (ECS_HAS_RELATION(e, EcsChildOf) || ECS_HAS_RELATION(e, EcsIsA)) {
-            ecs_set_watch(world, ecs_pair_object(world, e));
-        }        
+        }      
     }
+}
 
-    ecs_register_table(world, table);
+static
+ecs_flags32_t get_component_action_flags(
+    const ecs_type_info_t *c_info) 
+{
+    ecs_flags32_t flags = 0;
 
-    /* Register component info flags for all columns */
-    ecs_table_notify(world, table, &(ecs_table_event_t){
-        .kind = EcsTableComponentInfo
-    });
+    if (c_info->lifecycle.ctor) {
+        flags |= EcsTableHasCtors;
+    }
+    if (c_info->lifecycle.dtor) {
+        flags |= EcsTableHasDtors;
+    }
+    if (c_info->lifecycle.copy) {
+        flags |= EcsTableHasCopy;
+    }
+    if (c_info->lifecycle.move) {
+        flags |= EcsTableHasMove;
+    }  
+
+    return flags;  
+}
+
+/* Check if table has instance of component, including pairs */
+static
+bool has_component(
+    ecs_world_t *world,
+    ecs_type_t type,
+    ecs_entity_t component)
+{
+    ecs_entity_t *entities = ecs_vector_first(type, ecs_entity_t);
+    int32_t i, count = ecs_vector_count(type);
+
+    for (i = 0; i < count; i ++) {
+        if (component == ecs_get_typeid(world, entities[i])) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/* Track whenever new component lifecycle callbacks are registered.
+ * Cache the component lifecycle data on the table to accelerate 
+ * operations on component values. */
+static
+void on_component_lifecycle(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    ecs_table_t *table = it->ctx;
+    ecs_type_t table_type = table->type;
+
+    int i;
+    for (i = 0; i < it->count; i ++) {
+        ecs_entity_t component = it->entities[i];
+
+        if (!component || has_component(world, table_type, component)){
+            int32_t column_count = ecs_vector_count(table_type);
+            ecs_assert(!component || column_count != 0, 
+                ECS_INTERNAL_ERROR, NULL);
+
+            if (!column_count) {
+                return;
+            }
+            
+            if (!table->c_info) {
+                table->c_info = ecs_os_calloc(
+                    ECS_SIZEOF(ecs_type_info_t*) * column_count);
+            }
+
+            /* Reset lifecycle flags before recomputing */
+            table->flags &= ~EcsTableHasLifecycle;
+
+            /* Recompute lifecycle flags */
+            ecs_entity_t *array = ecs_vector_first(table_type, ecs_entity_t);
+            int32_t j;
+            for (j = 0; j < column_count; j++) {
+                ecs_entity_t c = ecs_get_typeid(world, array[j]);
+                if (!c) {
+                    continue;
+                }
+                
+                const ecs_type_info_t *c_info = ecs_get_c_info(world, c);
+                if (c_info) {
+                    ecs_flags32_t flags = get_component_action_flags(c_info);
+                    table->flags |= flags;
+                }
+
+                /* Store pointer to c_info for fast access */
+                table->c_info[j] = (ecs_type_info_t*)c_info;
+            }        
+        }
+    }
+}
+
+/* Keep track of the kinds of triggers that are registered for ids in
+ * this table and store the result in table->flags. This allows other
+ * parts of the code to quickly check if triggers need to be evaluated
+ * for entities in this table. */
+static
+void on_create_trigger(
+    ecs_iter_t *it)
+{
+    ecs_world_t *world = it->world;
+    ecs_table_t *table = it->ctx;
+
+    int i;
+    for (i = 0; i < it->count; i ++) {
+        const EcsTrigger *t = ecs_get(
+            world, it->entities[i], EcsTrigger);
+        ecs_assert(t !=  NULL, ECS_INTERNAL_ERROR, NULL);
+        
+        const ecs_trigger_t *trigger = t->trigger;
+        ecs_assert(trigger != NULL, ECS_INTERNAL_ERROR, NULL);
+        
+        int32_t e, event_count = trigger->event_count;
+        const ecs_entity_t *events = t->trigger->events;
+
+        for (e = 0; e < event_count; e ++) {
+            ecs_entity_t event = events[e];
+            
+            if (!(table->flags & EcsTableIsDisabled)) {
+                if (event == EcsOnAdd) {
+                    table->flags |= EcsTableHasOnAdd;
+                } else if (event == EcsOnRemove) {
+                    table->flags |= EcsTableHasOnRemove;
+                } else if (event == EcsOnSet) {
+                    table->flags |= EcsTableHasOnSet;
+                } else if (event == EcsUnSet) {
+                    table->flags |= EcsTableHasUnSet;
+                }
+            }
+        }
+    }
+}
+
+static
+void init_triggers(
+    ecs_world_t *world,
+    ecs_table_t *table)
+{
+    ecs_id_t *ids = ecs_vector_first(table->type, ecs_id_t);
+    int32_t count = ecs_vector_count(table->type);
+    
+    /* Iterate components to initialize table flags */
+    int32_t i;
+    for (i = 0; i < count; i ++) {
+        ecs_id_t id = ids[i];
+
+        /* If id is not a component, lifecycle callbacks cannot be registered */
+        if (ecs_get_component(world, id) == NULL) {
+            continue;
+        }
+
+        /* Create trigger so table gets notified when component lifecycle
+         * callbacks are registered for an id */
+        ecs_trigger_init(world, &(ecs_trigger_desc_t) {
+            .events = { EcsOnComponentLifecycle },
+            .term.id = id,
+            .callback = on_component_lifecycle,
+            .ctx = table
+        });
+
+        /* Create trigger on trigger creation for fast path  */
+        ecs_trigger_init(world, &(ecs_trigger_desc_t) {
+            .events = { EcsOnCreateTrigger },
+            .term.id = id,
+            .callback = on_create_trigger,
+            .ctx = table
+        });        
+    }
 }
 
 static
 void init_table(
-    ecs_world_t * world,
-    ecs_table_t * table,
-    ecs_ids_t * entities)
+    ecs_world_t *world,
+    ecs_table_t *table,
+    ecs_ids_t *entities)
 {
     table->type = entities_to_type(entities);
     table->c_info = NULL;
@@ -277,6 +455,15 @@ void init_table(
     table->bs_column_count = bitset_column_count(table);
 
     init_edges(world, table);
+    init_flags(world, table);
+    init_triggers(world, table);
+
+    /* Register table with world so it can be found by its components */
+    ecs_register_table(world, table);
+
+    /* Register component info flags for all columns */
+    ecs_emit(world, &(ecs_event_desc_t){ EcsOnComponentLifecycle, NULL,
+        .payload_kind = EcsPayloadTable, .payload.table.table = table });    
 }
 
 static
@@ -308,9 +495,8 @@ ecs_table_t *create_table(
     };
     *(ecs_ids_t*)table_elem.key = key;
 
-    ecs_notify_queries(world, &(ecs_query_event_t) {
-        .kind = EcsQueryTableMatch,
-        .table = result
+    ecs_emit(world, &(ecs_event_desc_t){ EcsOnCreateTable, NULL,
+        EcsPayloadTable, .payload.table.table = result
     });
 
     ecs_log_pop();

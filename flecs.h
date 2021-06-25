@@ -1189,6 +1189,32 @@ private:
 
 #endif
 /**
+ * @file map.h
+ * @brief Set datastructure.
+ *
+ * Same as map, but with no payload.
+ */
+
+#ifndef FLECS_SET_H
+#define FLECS_SET_H
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define ecs_set_new(elem_count)\
+    _ecs_map_new(0, 0, elem_count)
+
+#define ecs_set_ensure(set, key)\
+    _ecs_map_ensure(set, 0, key)
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+/**
  * @file strbuf.h
  * @brief Utility for constructing strings.
  *
@@ -3101,7 +3127,7 @@ struct ecs_iter_t {
 
     ecs_id_t *ids;           /* Component ids. Size: term_count_actual */
     ecs_entity_t *subjects;  /* Subjects of terms, 0 for "This" terms. Size: term_count_actual */
-    size_t *sizes;           /* Component sizes. Size: term_count_actual */
+    ecs_size_t *sizes;       /* Component sizes. Size: term_count_actual */
     ecs_type_t *types;       /* Components as types. Size: term_count_actual */
 
     ecs_world_t *world;      /* The world. May point to a stage when in readonly mode. */
@@ -3834,37 +3860,49 @@ FLECS_API extern const ecs_entity_t EcsDisabled;
  * code. The tag has no functional implications. */
 FLECS_API extern const ecs_entity_t EcsHidden;
 
-/* Used to create triggers that subscribe on add events */
+/* Event. Triggers when an id (component, tag, pair) is added to an entity */
 FLECS_API extern const ecs_entity_t EcsOnAdd;
 
-/* Used to create triggers that subscribe on remove events */
+/* Event. Triggers when an id (component, tag, pair) is removed from an entity */
 FLECS_API extern const ecs_entity_t EcsOnRemove;
 
-/* Used to create systems that subscribe on set events */
+/* Event. Triggers when a component is set for an entity */
 FLECS_API extern const ecs_entity_t EcsOnSet;
 
-/* Used to create systems that subscribe on unset events */
+/* Event. Triggers when a component is unset for an entity */
 FLECS_API extern const ecs_entity_t EcsUnSet;
 
-/* Relationship used to define what should happen when an entity is deleted that
- * is added to other entities. For example, if an entity is used as a tag, and
- * this entity is deleted, this would leave dangling references (ids) to this
- * entity in the storage.
- * This relation, when combined with EcsRemove, EcsDelete or EcsThrow, can be
- * used to customize the deletion behavior. For example:
- *   ecs_add_pair(world, Position, EcsOnDelete, EcsThrow);
- *
- * This would throw an error when attempting to delete Position, if Position is
- * added to any entities at the time of deletion. */
+/* Event. Triggers when an entity is deleted.
+ * Also used as relation for defining cleanup behavior, see: 
+ * https://github.com/SanderMertens/flecs/blob/master/docs/Relations.md#relation-cleanup-properties
+ */
 FLECS_API extern const ecs_entity_t EcsOnDelete;
 
-/* Relationship with similar functionality to EcsDelete, except that it allows
- * for specifying behavior when an object of a relation is removed. For example:
- *   ecs_add_pair(world, EcsChildOf, EcsOnDeleteObject, EcsDelete);
- *
- * This specifies that whenever an object of a ChildOf relation (the parent) is 
- * removed, the entities with a relation to that object (the children) should be
- * deleted. */
+/* Event. Triggers when a table is created. */
+FLECS_API extern const ecs_entity_t EcsOnCreateTable;
+
+/* Event. Triggers when a table is deleted. */
+FLECS_API extern const ecs_entity_t EcsOnDeleteTable;
+
+/* Event. Triggers when a table becomes empty (doesn't trigger on creation). */
+FLECS_API extern const ecs_entity_t EcsOnTableEmpty;
+
+/* Event. Triggers when a table becomes non-empty. */
+FLECS_API extern const ecs_entity_t EcsOnTableNonEmpty;
+
+/* Event. Triggers when a trigger is created. */
+FLECS_API extern const ecs_entity_t EcsOnCreateTrigger;
+
+/* Event. Triggers when a trigger is deleted. */
+FLECS_API extern const ecs_entity_t EcsOnDeleteTrigger;
+
+/* Event. Triggers when lifecycle methods for a component are registered */
+FLECS_API extern const ecs_entity_t EcsOnComponentLifecycle;
+
+/* Relationship used to define what should happen when an entity is deleted that
+ * is added to other entities. For details see: 
+ * https://github.com/SanderMertens/flecs/blob/master/docs/Relations.md#relation-cleanup-properties
+ */
 FLECS_API extern const ecs_entity_t EcsOnDeleteObject;
 
 /* Specifies that a component/relation/object of relation should be removed when
@@ -6388,6 +6426,42 @@ void* ecs_get_observer_binding_ctx(
 
 /** @} */
 
+
+/**
+ * @defgroup notifications Notifications
+ */
+
+typedef enum ecs_payload_kind_t {
+    EcsPayloadNone,
+    EcsPayloadEntity,
+    EcsPayloadTable,
+    EcsPayloadParam
+} ecs_payload_kind_t;
+
+typedef struct ecs_event_desc_t {
+    ecs_entity_t event;
+    ecs_ids_t *ids; /* When NULL, notify for all ids in entity/table type */
+    ecs_payload_kind_t payload_kind;
+    union {
+        ecs_entity_t entity;
+        struct {
+            ecs_table_t *table;
+            int32_t offset;
+            int32_t count; /* When 0 notify all entities starting from offset */
+        } table;
+        struct {
+            void *param;
+        } user;
+    } payload;
+} ecs_event_desc_t;
+
+/** Send event.
+ */
+void ecs_emit( 
+    ecs_world_t *world,
+    ecs_event_desc_t *desc);
+
+/** @} */
 
 /**
  * @defgroup iterator Iterators

@@ -89,123 +89,20 @@ ecs_data_t* ecs_init_data(
     return result;
 }
 
-static
-ecs_flags32_t get_component_action_flags(
-    const ecs_type_info_t *c_info) 
-{
-    ecs_flags32_t flags = 0;
-
-    if (c_info->lifecycle.ctor) {
-        flags |= EcsTableHasCtors;
-    }
-    if (c_info->lifecycle.dtor) {
-        flags |= EcsTableHasDtors;
-    }
-    if (c_info->lifecycle.copy) {
-        flags |= EcsTableHasCopy;
-    }
-    if (c_info->lifecycle.move) {
-        flags |= EcsTableHasMove;
-    }  
-
-    return flags;  
-}
-
-/* Check if table has instance of component, including pairs */
-static
-bool has_component(
-    ecs_world_t *world,
-    ecs_type_t type,
-    ecs_entity_t component)
-{
-    ecs_entity_t *entities = ecs_vector_first(type, ecs_entity_t);
-    int32_t i, count = ecs_vector_count(type);
-
-    for (i = 0; i < count; i ++) {
-        if (component == ecs_get_typeid(world, entities[i])) {
-            return true;
-        }
-    }
-    
-    return false;
-}
-
-static
-void notify_component_info(
-    ecs_world_t *world,
-    ecs_table_t *table,
-    ecs_entity_t component)
-{
-    ecs_type_t table_type = table->type;
-    if (!component || has_component(world, table_type, component)){
-        int32_t column_count = ecs_vector_count(table_type);
-        ecs_assert(!component || column_count != 0, ECS_INTERNAL_ERROR, NULL);
-
-        if (!column_count) {
-            return;
-        }
-        
-        if (!table->c_info) {
-            table->c_info = ecs_os_calloc(
-                ECS_SIZEOF(ecs_type_info_t*) * column_count);
-        }
-
-        /* Reset lifecycle flags before recomputing */
-        table->flags &= ~EcsTableHasLifecycle;
-
-        /* Recompute lifecycle flags */
-        ecs_entity_t *array = ecs_vector_first(table_type, ecs_entity_t);
-        int32_t i;
-        for (i = 0; i < column_count; i ++) {
-            ecs_entity_t c = ecs_get_typeid(world, array[i]);
-            if (!c) {
-                continue;
-            }
-            
-            const ecs_type_info_t *c_info = ecs_get_c_info(world, c);
-            if (c_info) {
-                ecs_flags32_t flags = get_component_action_flags(c_info);
-                table->flags |= flags;
-            }
-
-            /* Store pointer to c_info for fast access */
-            table->c_info[i] = (ecs_type_info_t*)c_info;
-        }        
-    }
-}
-
-static
-void notify_trigger(
-    ecs_world_t *world, 
-    ecs_table_t *table, 
-    ecs_entity_t event) 
-{
-    (void)world;
-
-    if (!(table->flags & EcsTableIsDisabled)) {
-        if (event == EcsOnAdd) {
-            table->flags |= EcsTableHasOnAdd;
-        } else if (event == EcsOnRemove) {
-            table->flags |= EcsTableHasOnRemove;
-        } else if (event == EcsOnSet) {
-            table->flags |= EcsTableHasOnSet;
-        } else if (event == EcsUnSet) {
-            table->flags |= EcsTableHasUnSet;
-        }
-    }
-}
 
 /* -- Private functions -- */
 
-/* If table goes from 0 to >0 entities or from >0 entities to 0 entities notify
- * queries. This allows systems associated with queries to move inactive tables
- * out of the main loop. */
+/* Emit event when table goes from empty to non-empty or vice versa. */
 void ecs_table_activate(
     ecs_world_t *world,
     ecs_table_t *table,
     bool activate)
 {
-    /* TODO */
+    ecs_entity_t event = activate ? EcsOnTableNonEmpty : EcsOnTableEmpty;
+    
+    ecs_emit(world, &(ecs_event_desc_t) { event, NULL,
+        EcsPayloadTable, .payload.table.table = table
+    });
 }
 
 ecs_data_t* ecs_table_get_data(
@@ -420,9 +317,14 @@ void ecs_table_free(
     ecs_world_t *world,
     ecs_table_t *table)
 {
+    /* Cannot free a table while it's locked */
     ecs_assert(!table->lock, ECS_LOCKED_STORAGE, NULL);
 
-    (void)world;
+    /* Emit table deletion event */
+    ecs_emit(world, &(ecs_event_desc_t){ EcsOnDeleteTable, NULL,
+        EcsPayloadTable, .payload.table.table = table
+    });
+
     ecs_data_t *data = ecs_table_get_data(table);
     if (data) {
         ecs_table_clear_data(world, table, data);
@@ -1821,25 +1723,6 @@ int32_t* ecs_table_get_monitor(
 
     int32_t column_count = table->column_count;
     return ecs_os_memdup(dirty_state, (column_count + 1) * ECS_SIZEOF(int32_t));
-}
-
-void ecs_table_notify(
-    ecs_world_t *world,
-    ecs_table_t *table,
-    ecs_table_event_t * event)
-{
-    if (world->is_fini) {
-        return;
-    }
-
-    switch(event->kind) {
-    case EcsTableComponentInfo:
-        notify_component_info(world, table, event->component);
-        break;
-    case EcsTableTriggerMatch:
-        notify_trigger(world, table, event->event);
-        break;
-    }
 }
 
 void ecs_table_lock(

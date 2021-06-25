@@ -136,8 +136,6 @@ bool ecs_filter_populate_from_type(
     bool is_or = false;
     bool or_result = false;
 
-    printf("filter = %s (match type)\n", ecs_filter_str(world, filter));
-
     for (i = 0; i < count; i ++) {
         ecs_term_t *term = &terms[i];
         ecs_id_t id = term->id;
@@ -195,7 +193,7 @@ bool ecs_filter_populate_from_type(
         if (term->oper == EcsNot) {
             result = !result;
         }
-        
+
         if (op == EcsNot) {
             result = !result;
         }
@@ -215,8 +213,6 @@ bool ecs_filter_populate_from_type(
             matched->subjects[i] = subject;
             matched->type_map[i] = index;
             matched->types[i] = ecs_type_from_id(world, id);
-
-            printf("- subjects[%d] = %d\n", i, subject);
 
             const EcsComponent *comp = ecs_get_component(world, id);
             if (comp) {
@@ -247,12 +243,8 @@ void ecs_filter_populate_from_table(
     int32_t i, count = filter->term_count;
     ecs_term_t *terms = filter->terms;
 
-    printf("filter = %s\n", ecs_filter_str(world, filter));
-
     for (i = 0; i < count; i ++) {
         ecs_term_t *term = &terms[i];
-
-        printf("- i = %d\n", i);
 
         columns[i] = NULL;
 
@@ -262,9 +254,6 @@ void ecs_filter_populate_from_table(
         }
 
         int32_t index = matched->type_map[i];
-
-        printf("- index = %d\n", index);
-        printf("- subjects = %d\n", matched->subjects[i]);
 
         if (index >= table->column_count) {
             /* Term is not a component */
@@ -844,15 +833,15 @@ ecs_iter_t ecs_filter_iter(
             it.subjects = NULL;
         }
     } else {
-        it.ids = ecs_os_malloc(term_count_actual * sizeof(ecs_id_t));
-        it.sizes = ecs_os_malloc(term_count_actual * sizeof(size_t));
-        it.types = ecs_os_malloc(term_count_actual * sizeof(ecs_type_t));
-        it.type_map = ecs_os_malloc(term_count_actual * sizeof(int32_t*));
-        it.columns = ecs_os_malloc(term_count_actual * sizeof(void*));
+        it.ids = ecs_os_malloc(term_count_actual * ECS_SIZEOF(ecs_id_t));
+        it.sizes = ecs_os_malloc(term_count_actual * ECS_SIZEOF(size_t));
+        it.types = ecs_os_malloc(term_count_actual * ECS_SIZEOF(ecs_type_t));
+        it.type_map = ecs_os_malloc(term_count_actual * ECS_SIZEOF(int32_t*));
+        it.columns = ecs_os_malloc(term_count_actual * ECS_SIZEOF(void*));
         
         if (!filter->match_only_this) {
             it.subjects = ecs_os_malloc(
-                term_count_actual * sizeof(ecs_entity_t));
+                term_count_actual * ECS_SIZEOF(ecs_entity_t));
         }
     }
     
@@ -923,8 +912,9 @@ bool ecs_filter_next(
         
         /* 1. The iterator needs to evaluate all tables */
         if (kind == EcsFilterIterEvalAll) {
-            table = ecs_sparse_get_sparse(
-                iter->tables, ecs_table_t, iter->tables_iter);
+            ecs_assert(iter->tables_iter > 0, ECS_INTERNAL_ERROR, NULL);
+            table = ecs_sparse_get(
+                iter->tables, ecs_table_t, (uint64_t)iter->tables_iter);
             iter->tables_iter ++;
         } else
 

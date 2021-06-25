@@ -30,7 +30,7 @@ void observer_callback(ecs_iter_t *it) {
         user_it.type_map = matched.type_map;
         user_it.ids = matched.ids;
         user_it.subjects = matched.subjects;
-        user_it.sizes = (size_t*)matched.sizes;
+        user_it.sizes = matched.sizes;
         user_it.system = o->entity;
         user_it.ctx = o->ctx;
         user_it.terms = o->filter.terms;

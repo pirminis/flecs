@@ -60,31 +60,7 @@ typedef struct ecs_type_info_t {
     ecs_entity_t component;
     EcsComponentLifecycle lifecycle; /* Component lifecycle callbacks */
     bool lifecycle_set;
-} ecs_type_info_t;
-
-/* Table event type for notifying tables of world events */
-typedef enum ecs_table_eventkind_t {
-    EcsTableTriggerMatch,
-    EcsTableComponentInfo
-} ecs_table_eventkind_t;
-
-typedef struct ecs_table_event_t {
-    ecs_table_eventkind_t kind;
-
-    /* Query event */
-    ecs_query_t *query;
-    int32_t matched_table_index;
-
-    /* Component info event */
-    ecs_entity_t component;
-
-    /* Trigger match */
-    ecs_entity_t event;
-
-    /* If the nubmer of fields gets out of hand, this can be turned into a union
-     * but since events are very temporary objects, this works for now and makes
-     * initializing an event a bit simpler. */
-} ecs_table_event_t;    
+} ecs_type_info_t;   
 
 /** A component column. */
 struct ecs_column_t {
@@ -123,9 +99,7 @@ typedef struct ecs_table_leaf_t {
 /** Flags for quickly checking for special properties of a table. */
 #define EcsTableHasBuiltins         1u    /* Does table have builtin components */
 #define EcsTableIsPrefab            2u    /* Does the table store prefabs */
-#define EcsTableHasBase             4u    /* Does the table type has IsA */
-#define EcsTableHasParent           8u    /* Does the table type has ChildOf */
-#define EcsTableHasComponentData    16u   /* Does the table have component data */
+#define EcsTableHasIsA             4u    /* Does the table type has IsA */
 #define EcsTableHasXor              32u   /* Does the table type has XOR */
 #define EcsTableIsDisabled          64u   /* Does the table type has EcsDisabled */
 #define EcsTableHasCtors            128u
@@ -143,8 +117,8 @@ typedef struct ecs_table_leaf_t {
 /* Composite constants */
 #define EcsTableHasLifecycle        (EcsTableHasCtors | EcsTableHasDtors)
 #define EcsTableIsComplex           (EcsTableHasLifecycle | EcsTableHasSwitch | EcsTableHasDisabled)
-#define EcsTableHasAddActions       (EcsTableHasBase | EcsTableHasSwitch | EcsTableHasCtors | EcsTableHasOnAdd | EcsTableHasOnSet | EcsTableHasMonitors)
-#define EcsTableHasRemoveActions    (EcsTableHasBase | EcsTableHasDtors | EcsTableHasOnRemove | EcsTableHasUnSet | EcsTableHasMonitors)
+#define EcsTableHasAddActions       (EcsTableHasIsA | EcsTableHasSwitch | EcsTableHasCtors | EcsTableHasOnAdd | EcsTableHasOnSet | EcsTableHasMonitors)
+#define EcsTableHasRemoveActions    (EcsTableHasIsA | EcsTableHasDtors | EcsTableHasOnRemove | EcsTableHasUnSet | EcsTableHasMonitors)
 
 /** Edge used for traversing the table graph. */
 typedef struct ecs_edge_t {
@@ -325,17 +299,15 @@ struct ecs_query_t {
     bool constraints_satisfied; /* Are all term constraints satisfied */
 };
 
-/** Event mask */
-#define EcsEventAdd    (1)
-#define EcsEventRemove (2)
+/** All triggers for a specific (component) id */
+typedef struct ecs_id_triggers_t {
+    ecs_map_t *triggers; /* map<trigger_id, void> */
+} ecs_id_triggers_t;
 
-/** Triggers for a specific id */
-typedef struct ecs_id_trigger_t {
-    ecs_map_t *on_add_triggers;
-    ecs_map_t *on_remove_triggers;
-    ecs_map_t *on_set_triggers;
-    ecs_map_t *un_set_triggers;
-} ecs_id_trigger_t;
+/** All triggers for a specific event */
+typedef struct ecs_event_triggers_t {
+    ecs_map_t *triggers; /* map<component_id, ecs_id_trigger_t> */
+} ecs_event_triggers_t;
 
 /** Keep track of how many [in] columns are active for [out] columns of OnDemand
  * systems. */
@@ -503,12 +475,12 @@ struct ecs_world_t {
 
     /* --  Type metadata -- */
 
-    ecs_map_t *id_index;         /* map<id, ecs_id_record_t> */
-    ecs_map_t *id_triggers;      /* map<id, ecs_id_trigger_t> */
-    ecs_sparse_t *type_info;     /* sparse<type_id, type_info_t> */
-
     /* Is entity range checking enabled? */
     bool range_check_enabled;
+    
+    ecs_sparse_t *type_info;      /* sparse<type_id, type_info_t> */
+    ecs_map_t *id_index;          /* map<id, ecs_id_record_t> */
+    ecs_sparse_t *event_triggers; /* sparse<event, ecs_event_triggers_t> */
 
 
     /* --  Data storage -- */
@@ -519,8 +491,8 @@ struct ecs_world_t {
     /* --  Storages for API objects -- */
 
     ecs_sparse_t *queries; /* sparse<query_id, ecs_query_t> */
-    ecs_sparse_t *triggers; /* sparse<query_id, ecs_trigger_t> */
-    ecs_sparse_t *observers; /* sparse<query_id, ecs_observer_t> */
+    ecs_sparse_t *triggers; /* sparse<trigger_id, ecs_trigger_t> */
+    ecs_sparse_t *observers; /* sparse<observer_id, ecs_observer_t> */
     
 
     /* Keep track of components that were added/removed to/from monitored

@@ -160,7 +160,7 @@ void ecs_get_world_stats(
 
     int32_t i, count = ecs_sparse_count(world->store.tables);
     for (i = 0; i < count; i ++) {
-        ecs_table_t *table = ecs_sparse_get(world->store.tables, ecs_table_t, i);
+        ecs_table_t *table = ecs_sparse_get_dense(world->store.tables, ecs_table_t, i);
         int32_t entity_count = ecs_table_count(table);
 
         if (!entity_count) {

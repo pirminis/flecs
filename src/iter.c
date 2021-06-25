@@ -40,7 +40,7 @@ void ecs_iter_init_from_cached_type(
 {
     it->ids = type->ids;
     it->subjects = type->subjects;
-    it->sizes = (size_t*)type->sizes;
+    it->sizes = type->sizes;
     it->types = type->types;
     it->type_map = type->type_map;
 }
@@ -50,7 +50,7 @@ void ecs_iter_init_from_storage(
 {
     it->ids = it->private.ids_storage;
     it->subjects = it->private.subjects_storage;
-    it->sizes = (size_t*)it->private.sizes_storage;
+    it->sizes = it->private.sizes_storage;
     it->types = it->private.types_storage;
     it->type_map = it->private.type_map_storage;
     it->columns = it->private.columns_storage;
@@ -66,7 +66,7 @@ void* ecs_term_w_size(
 {
     ecs_assert(term_index <= it->term_count, ECS_INVALID_PARAMETER, NULL);
     ecs_assert(term_index > 0, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(it->sizes[term_index - 1] == size, ECS_INVALID_PARAMETER, NULL);
+    ecs_assert(ecs_term_size(it, term_index) == size, ECS_INVALID_PARAMETER, NULL);
     return it->columns[term_index - 1];
 }
 
@@ -134,7 +134,7 @@ size_t ecs_term_size(
 {
     ecs_assert(term_index <= it->term_count, ECS_INVALID_PARAMETER, NULL);
     ecs_assert(term_index > 0, ECS_INVALID_PARAMETER, NULL);
-    return it->sizes[term_index - 1];
+    return ecs_to_size_t(it->sizes[term_index - 1]);
 }
 
 ecs_type_t ecs_iter_type(
@@ -201,5 +201,6 @@ void* ecs_element_w_size(
     int32_t column,
     int32_t row)
 {
-    return ECS_OFFSET(ecs_term_w_size(it, size, column), size * row);
+    return ECS_OFFSET(ecs_term_w_size(it, size, column), 
+        ecs_from_size_t(size) * row);
 }

@@ -75,20 +75,6 @@ void ecs_unregister_name(
 //// World API
 ////////////////////////////////////////////////////////////////////////////////
 
-void ecs_notify(
-    ecs_world_t * world,
-    ecs_table_t * table,
-    ecs_data_t * data,
-    int32_t row,
-    int32_t count,
-    ecs_entity_t event,
-    ecs_ids_t *ids);
-
-/* Notify systems that there is a new table, which triggers matching */
-void ecs_notify_queries_of_table(
-    ecs_world_t *world,
-    ecs_table_t *table);
-
 /* Get current stage */
 ecs_stage_t* ecs_stage_from_world(
     ecs_world_t **world_ptr);
@@ -120,15 +106,6 @@ void ecs_monitor_register(
     ecs_entity_t relation,
     ecs_entity_t id,
     ecs_query_t *query);
-
-void ecs_notify_tables(
-    ecs_world_t *world,
-    ecs_id_t id,
-    ecs_table_event_t *event);
-
-void ecs_notify_queries(
-    ecs_world_t *world,
-    ecs_query_event_t *event);
 
 void ecs_register_table(
     ecs_world_t *world,
@@ -330,7 +307,6 @@ void ecs_run_add_actions(
 void ecs_run_remove_actions(
     ecs_world_t *world,
     ecs_table_t *table,
-    ecs_data_t *data,
     int32_t row,
     int32_t count,
     ecs_ids_t *removed);
@@ -504,11 +480,6 @@ int32_t ecs_table_switch_from_case(
     const ecs_table_t *table,
     ecs_entity_t add);    
 
-void ecs_table_notify(
-    ecs_world_t *world,
-    ecs_table_t *table,
-    ecs_table_event_t *event);
-
 void ecs_table_clear_edges(
     ecs_world_t *world,
     ecs_table_t *table);
@@ -535,14 +506,6 @@ void ecs_query_rematch(
     ecs_world_t *world,
     ecs_query_t *query);
 
-void ecs_run_monitor(
-    ecs_world_t *world,
-    ecs_matched_query_t *monitor,
-    ecs_ids_t *components,
-    int32_t row,
-    int32_t count,
-    ecs_entity_t *entities);
-
 bool ecs_query_match(
     const ecs_world_t *world,
     const ecs_table_t *table,
@@ -553,7 +516,6 @@ void ecs_query_notify(
     ecs_world_t *world,
     ecs_query_t *query,
     ecs_query_event_t *event);
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Filter API

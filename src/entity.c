@@ -64,7 +64,7 @@ void* get_base_component(
     ecs_assert(recur_depth < ECS_MAX_RECURSION, ECS_INVALID_PARAMETER, NULL);
 
     /* Table (and thus entity) does not have component, look for base */
-    if (!(table->flags & EcsTableHasBase)) {
+    if (!(table->flags & EcsTableHasIsA)) {
         return NULL;
     }
 
@@ -239,37 +239,55 @@ int ecs_get_column_info(
     }
 }
 
-void ecs_notify(
+void ecs_emit(
     ecs_world_t * world,
-    ecs_table_t * table,
-    ecs_data_t * data,
-    int32_t row,
-    int32_t count,
-    ecs_entity_t event,
-    ecs_ids_t *ids)
+    ecs_event_desc_t *desc)
 {
-    if (ids) {
-        ecs_assert(data != NULL, ECS_INTERNAL_ERROR, NULL);
-        ecs_id_t *arr = ids->array;
-        int32_t arr_count = ids->count;
+    ecs_ids_t ids_storage, *ids = desc->ids;
+    ecs_table_t *table = NULL;
+    ecs_data_t *data = NULL;
+    int32_t row = 0;
+    int32_t count = 1;
+    ecs_entity_t event = desc->event;
 
-        int i;
-        for (i = 0; i < arr_count; i ++) {
-            ecs_triggers_notify(world, arr[i], event, table, data, row, count);
+    if (desc->payload_kind == EcsPayloadEntity) {
+        ecs_assert(desc->payload.entity != 0, ECS_INTERNAL_ERROR, NULL);
+        ecs_record_t *r = ecs_eis_get(world, desc->payload.entity);
+        if (r) {
+            bool is_watched;
+            table = r->table;
+            row = ecs_record_to_row(r->row, &is_watched);
         }
-    } else {
-        ecs_id_t *ids = ecs_vector_first(table->type, ecs_id_t);
-        int32_t i, column_count = table->column_count;
-        for (i = 0; i < column_count; i ++) {
-            ecs_column_t *column = &data->columns[i];
-            if (column->size) {
-                ecs_ids_t component = {
-                    .array = &ids[i],
-                    .count = 1
-                };
-                ecs_notify(world, table, data, row, count, EcsOnSet, &component);
-            }
-        }      
+
+    } else if (desc->payload_kind == EcsPayloadTable) {
+        ecs_assert(desc->payload.table.table != NULL, ECS_INTERNAL_ERROR, NULL);
+        table = desc->payload.table.table;
+        row = desc->payload.table.offset;
+        int32_t payload_count = desc->payload.table.count;
+        if (!payload_count) {
+            count = payload_count - row;
+        } else {
+            count = payload_count;
+        }
+    }
+
+    if (table) {
+        data = ecs_table_get_data(table);
+        if (!ids) {
+            ids = &ids_storage;
+            ids_storage.array = ecs_vector_first(table->type, ecs_id_t);
+            ids_storage.count = ecs_vector_count(table->type);
+        }
+    }
+    
+    ecs_assert(ids->count != 0, ECS_INVALID_PARAMETER, NULL);
+
+    ecs_id_t *id_array = ids->array;
+    int32_t id_count = ids->count;
+
+    int i;
+    for (i = 0; i < id_count; i ++) {
+        ecs_triggers_notify(world, id_array[i], event, table, data, row, count);
     }
 }
 
@@ -666,7 +684,7 @@ void ecs_run_add_actions(
     ecs_assert(added != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(added->count < ECS_MAX_ADD_REMOVE, ECS_INVALID_PARAMETER, NULL);
 
-    if (table->flags & EcsTableHasBase) {
+    if (table->flags & EcsTableHasIsA) {
         ecs_column_info_t cinfo[ECS_MAX_ADD_REMOVE];
         int added_count = ecs_get_column_info(
             world, table, added, cinfo, get_all);
@@ -681,14 +699,14 @@ void ecs_run_add_actions(
     }
 
     if (table->flags & EcsTableHasOnAdd) {
-        ecs_notify(world, table, data, row, count, EcsOnAdd, added);
+        ecs_emit(world, &(ecs_event_desc_t){EcsOnAdd, added, 
+            EcsPayloadTable, .payload.table = {table, row, count} });
     }
 }
 
 void ecs_run_remove_actions(
     ecs_world_t * world,
     ecs_table_t * table,
-    ecs_data_t * data,
     int32_t row,
     int32_t count,
     ecs_ids_t * removed)
@@ -697,10 +715,13 @@ void ecs_run_remove_actions(
     ecs_assert(removed->count < ECS_MAX_ADD_REMOVE, ECS_INVALID_PARAMETER, NULL);
 
     if (table->flags & EcsTableHasUnSet) {
-        ecs_notify(world, table, data, row, count, EcsUnSet, removed);
+        ecs_emit(world, &(ecs_event_desc_t){EcsUnSet, removed, 
+            EcsPayloadTable, .payload.table = {table, row, count} });
     } 
+
     if (table->flags & EcsTableHasOnRemove) {
-        ecs_notify(world, table, data, row, count, EcsOnRemove, removed);
+        ecs_emit(world, &(ecs_event_desc_t){EcsOnRemove, removed, 
+            EcsPayloadTable, .payload.table = {table, row, count} });
     }  
 }
 
@@ -783,7 +804,7 @@ int32_t move_entity(
             /* If entity was moved, invoke UnSet monitors for each component  
              * that the entity no longer has */
             ecs_run_remove_actions(
-                world, src_table, src_data, src_row, 1, removed);
+                world, src_table, src_row, 1, removed);
         }
 
         ecs_table_move(world, entity, entity, dst_table, dst_data, dst_row, 
@@ -802,7 +823,7 @@ int32_t move_entity(
         /* If removed components were overrides, run OnSet systems for those, as 
          * the value of those components changed from the removed component to 
          * the value of component on the base entity */
-        if (removed && dst_table->flags & EcsTableHasBase) {
+        if (removed && dst_table->flags & EcsTableHasIsA) {
             /* TODO */      
         }
     }
@@ -824,7 +845,7 @@ void delete_entity(
         /* Invoke remove actions before deleting */
         if (src_table->flags & EcsTableHasRemoveActions) {   
             ecs_run_remove_actions(
-                world, src_table, src_data, src_row, 1, removed);
+                world, src_table, src_row, 1, removed);
         } 
     }
 
@@ -1057,7 +1078,8 @@ const ecs_entity_t* new_w_data(
             }
         };
 
-        ecs_notify(world, table, data, row, count, EcsOnSet, NULL);
+        ecs_emit(world, &(ecs_event_desc_t){EcsOnSet, NULL,
+            EcsPayloadTable, .payload.table = {table, row, count} });
     }
 
     ecs_defer_flush(world, &world->stage);
@@ -2288,7 +2310,7 @@ void remove_from_table(
             int32_t src_count = ecs_table_count(src_table);
             if (removed.count && src_data) {
                 ecs_run_remove_actions(world, src_table, 
-                    src_data, 0, src_count, &removed);
+                    0, src_count, &removed);
             }
 
             ecs_data_t *dst_data = ecs_table_get_data(dst_table);
@@ -2310,7 +2332,7 @@ void delete_objects(
         int32_t i, count = ecs_vector_count(data->entities);
         for (i = 0; i < count; i ++) {
             ecs_entity_t e = entities[i];
-            ecs_record_t *r = ecs_sparse_get_sparse(
+            ecs_record_t *r = ecs_sparse_get(
                 world->store.entity_index, ecs_record_t, e);
             
             /* If row is negative, it means the entity is being monitored. Only
@@ -2457,7 +2479,7 @@ void ecs_delete(
         return;
     }
 
-    ecs_record_t *r = ecs_sparse_get_sparse(
+    ecs_record_t *r = ecs_sparse_get(
         world->store.entity_index, ecs_record_t, entity);
     if (r) {
         ecs_entity_info_t info = {0};
@@ -2623,8 +2645,8 @@ ecs_entity_t ecs_clone(
 
         int i;
         for (i = 0; i < to_add.count; i ++) {
-            ecs_notify(world, src_table, src_info.data, 
-                dst_info.row, 1, EcsOnSet, NULL);
+            ecs_emit(world, &(ecs_event_desc_t){EcsOnSet, NULL, EcsPayloadTable, 
+                .payload.table = {src_info.table, dst_info.row, 1} });
         }
     }
 
@@ -2811,7 +2833,9 @@ void ecs_modified_w_id(
             .array = &id,
             .count = 1
         };
-        ecs_notify(world, info.table, info.data, info.row, 1, EcsOnSet, &added);
+
+        ecs_emit(world, &(ecs_event_desc_t){EcsOnSet, &added, EcsPayloadTable, 
+            .payload.table = {info.table, info.row, 1} });
     }
 
     ecs_table_mark_dirty(info.table, id);
@@ -2888,7 +2912,8 @@ ecs_entity_t assign_ptr_w_id(
     ecs_table_mark_dirty(info.table, id);
 
     if (do_notify) {
-        ecs_notify(world, info.table, info.data, info.row, 1, EcsOnSet, &added);
+        ecs_emit(world, &(ecs_event_desc_t){EcsOnSet, &added, EcsPayloadTable, 
+            .payload.table = {info.table, info.row, 1} });
     }
 
     ecs_defer_flush(world, stage);
@@ -3414,7 +3439,7 @@ int32_t ecs_count_filter(
     int32_t result = 0;
 
     for (i = 0; i < count; i ++) {
-        ecs_table_t *table = ecs_sparse_get(tables, ecs_table_t, i);
+        ecs_table_t *table = ecs_sparse_get_dense(tables, ecs_table_t, i);
         if (!filter || ecs_table_match_filter(world, table, filter)) {
             result += ecs_table_count(table);
         }

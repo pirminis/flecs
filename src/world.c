@@ -1,69 +1,68 @@
 #include "private_api.h"
 
+/* Core scopes & entities */
+const ecs_entity_t EcsWorld =                 ECS_HI_COMPONENT_ID + 0;
+const ecs_entity_t EcsFlecs =                 ECS_HI_COMPONENT_ID + 1;
+const ecs_entity_t EcsFlecsCore =             ECS_HI_COMPONENT_ID + 2;
+const ecs_entity_t EcsModule =                ECS_HI_COMPONENT_ID + 3;
+const ecs_entity_t EcsPrefab =                ECS_HI_COMPONENT_ID + 4;
+const ecs_entity_t EcsDisabled =              ECS_HI_COMPONENT_ID + 5;
+const ecs_entity_t EcsHidden =                ECS_HI_COMPONENT_ID + 6;
+
+/* Relation properties */
+const ecs_entity_t EcsWildcard =              ECS_HI_COMPONENT_ID + 10;
+const ecs_entity_t EcsThis =                  ECS_HI_COMPONENT_ID + 11;
+const ecs_entity_t EcsTransitive =            ECS_HI_COMPONENT_ID + 12;
+const ecs_entity_t EcsFinal =                 ECS_HI_COMPONENT_ID + 13;
+const ecs_entity_t EcsTag =                   ECS_HI_COMPONENT_ID + 14;
+
+/* Relations */
+const ecs_entity_t EcsChildOf =               ECS_HI_COMPONENT_ID + 20;
+const ecs_entity_t EcsIsA =                   ECS_HI_COMPONENT_ID + 21;
+
+/* Events */
+const ecs_entity_t EcsOnAdd =                 ECS_HI_COMPONENT_ID + 30;
+const ecs_entity_t EcsOnRemove =              ECS_HI_COMPONENT_ID + 31;
+const ecs_entity_t EcsOnSet =                 ECS_HI_COMPONENT_ID + 32;
+const ecs_entity_t EcsUnSet =                 ECS_HI_COMPONENT_ID + 33;
+const ecs_entity_t EcsOnDelete =              ECS_HI_COMPONENT_ID + 34;
+const ecs_entity_t EcsOnCreateTable =         ECS_HI_COMPONENT_ID + 35;
+const ecs_entity_t EcsOnDeleteTable =         ECS_HI_COMPONENT_ID + 36;
+const ecs_entity_t EcsOnTableEmpty =          ECS_HI_COMPONENT_ID + 37;
+const ecs_entity_t EcsOnTableNonEmpty =       ECS_HI_COMPONENT_ID + 38;
+const ecs_entity_t EcsOnCreateTrigger =       ECS_HI_COMPONENT_ID + 39;
+const ecs_entity_t EcsOnDeleteTrigger =       ECS_HI_COMPONENT_ID + 40;
+const ecs_entity_t EcsOnComponentLifecycle =  ECS_HI_COMPONENT_ID + 41;
+const ecs_entity_t EcsOnDeleteObject =        ECS_HI_COMPONENT_ID + 42;
+
+/* Actions */
+const ecs_entity_t EcsRemove =                ECS_HI_COMPONENT_ID + 50;
+const ecs_entity_t EcsDelete =                ECS_HI_COMPONENT_ID + 51;
+const ecs_entity_t EcsThrow =                 ECS_HI_COMPONENT_ID + 52;
+
+/* Systems */
+const ecs_entity_t EcsOnDemand =              ECS_HI_COMPONENT_ID + 60;
+const ecs_entity_t EcsMonitor =               ECS_HI_COMPONENT_ID + 61;
+const ecs_entity_t EcsDisabledIntern =        ECS_HI_COMPONENT_ID + 62;
+const ecs_entity_t EcsInactive =              ECS_HI_COMPONENT_ID + 63;
+const ecs_entity_t EcsPipeline =              ECS_HI_COMPONENT_ID + 64;
+const ecs_entity_t EcsPreFrame =              ECS_HI_COMPONENT_ID + 65;
+const ecs_entity_t EcsOnLoad =                ECS_HI_COMPONENT_ID + 66;
+const ecs_entity_t EcsPostLoad =              ECS_HI_COMPONENT_ID + 67;
+const ecs_entity_t EcsPreUpdate =             ECS_HI_COMPONENT_ID + 68;
+const ecs_entity_t EcsOnUpdate =              ECS_HI_COMPONENT_ID + 69;
+const ecs_entity_t EcsOnValidate =            ECS_HI_COMPONENT_ID + 70;
+const ecs_entity_t EcsPostUpdate =            ECS_HI_COMPONENT_ID + 71;
+const ecs_entity_t EcsPreStore =              ECS_HI_COMPONENT_ID + 72;
+const ecs_entity_t EcsOnStore =               ECS_HI_COMPONENT_ID + 73;
+const ecs_entity_t EcsPostFrame =             ECS_HI_COMPONENT_ID + 74;
+
 /* Roles */
 const ecs_id_t ECS_CASE =  (ECS_ROLE | (0x7Cull << 56));
 const ecs_id_t ECS_SWITCH =  (ECS_ROLE | (0x7Bull << 56));
 const ecs_id_t ECS_PAIR =  (ECS_ROLE | (0x7Aull << 56));
 const ecs_id_t ECS_OWNED =  (ECS_ROLE | (0x75ull << 56));
 const ecs_id_t ECS_DISABLED =  (ECS_ROLE | (0x74ull << 56));
-
-/* Builtin entity ids */
-
-/* Builtin modules that contain all builtin entities */
-const ecs_entity_t EcsFlecs = (ECS_HI_COMPONENT_ID + 0);
-const ecs_entity_t EcsFlecsCore = (ECS_HI_COMPONENT_ID + 1);
-
-/* Singleton to attach data to a world */
-const ecs_entity_t EcsWorld = (ECS_HI_COMPONENT_ID + 2);
-
-/* Relations support */
-const ecs_entity_t EcsWildcard = (ECS_HI_COMPONENT_ID + 3);
-const ecs_entity_t EcsThis = (ECS_HI_COMPONENT_ID + 4);
-const ecs_entity_t EcsTransitive = (ECS_HI_COMPONENT_ID + 5);
-const ecs_entity_t EcsFinal = (ECS_HI_COMPONENT_ID + 6);
-const ecs_entity_t EcsTag = (ECS_HI_COMPONENT_ID + 7);
-
-/* Relation deletion policies */
-const ecs_entity_t EcsOnDelete = (ECS_HI_COMPONENT_ID + 8);
-const ecs_entity_t EcsOnDeleteObject = (ECS_HI_COMPONENT_ID + 9);
-const ecs_entity_t EcsRemove =  (ECS_HI_COMPONENT_ID + 10);
-const ecs_entity_t EcsDelete =  (ECS_HI_COMPONENT_ID + 11);
-const ecs_entity_t EcsThrow =  (ECS_HI_COMPONENT_ID + 12);
-
-/* Builtin relations */
-const ecs_entity_t EcsChildOf = (ECS_HI_COMPONENT_ID + 20);
-const ecs_entity_t EcsIsA = (ECS_HI_COMPONENT_ID + 21) ;
-
-/* Misc tags */
-const ecs_entity_t EcsModule = (ECS_HI_COMPONENT_ID + 22);
-const ecs_entity_t EcsPrefab = (ECS_HI_COMPONENT_ID + 23);
-const ecs_entity_t EcsDisabled = (ECS_HI_COMPONENT_ID + 24);
-const ecs_entity_t EcsHidden = (ECS_HI_COMPONENT_ID + 25);
-
-/* Trigger/observer Events */
-const ecs_entity_t EcsOnAdd = (ECS_HI_COMPONENT_ID + 26);
-const ecs_entity_t EcsOnRemove = (ECS_HI_COMPONENT_ID + 27);
-const ecs_entity_t EcsOnSet = (ECS_HI_COMPONENT_ID + 28);
-const ecs_entity_t EcsUnSet = (ECS_HI_COMPONENT_ID + 29);
-
-/* System tags */
-const ecs_entity_t EcsOnDemand = (ECS_HI_COMPONENT_ID + 40);
-const ecs_entity_t EcsMonitor = (ECS_HI_COMPONENT_ID + 41);
-const ecs_entity_t EcsDisabledIntern = (ECS_HI_COMPONENT_ID + 42);
-const ecs_entity_t EcsInactive = (ECS_HI_COMPONENT_ID + 43);
-
-/* Pipelines & builtin pipeline phases */
-const ecs_entity_t EcsPipeline = (ECS_HI_COMPONENT_ID + 44);
-const ecs_entity_t EcsPreFrame = (ECS_HI_COMPONENT_ID + 45);
-const ecs_entity_t EcsOnLoad = (ECS_HI_COMPONENT_ID + 46);
-const ecs_entity_t EcsPostLoad = (ECS_HI_COMPONENT_ID + 47);
-const ecs_entity_t EcsPreUpdate = (ECS_HI_COMPONENT_ID + 48);
-const ecs_entity_t EcsOnUpdate = (ECS_HI_COMPONENT_ID + 49);
-const ecs_entity_t EcsOnValidate = (ECS_HI_COMPONENT_ID + 50);
-const ecs_entity_t EcsPostUpdate = (ECS_HI_COMPONENT_ID + 51);
-const ecs_entity_t EcsPreStore = (ECS_HI_COMPONENT_ID + 52);
-const ecs_entity_t EcsOnStore = (ECS_HI_COMPONENT_ID + 53);
-const ecs_entity_t EcsPostFrame = (ECS_HI_COMPONENT_ID + 54);
 
 
 /* -- Private functions -- */
@@ -152,6 +151,7 @@ void eval_component_monitor(
                 }
 
                 ecs_vector_each(m->queries, ecs_query_t*, q_ptr, {
+                    // TODO: generalize to use ecs_emit
                     ecs_query_notify(world, *q_ptr, &(ecs_query_event_t) {
                         .kind = EcsQueryTableRematch
                     });
@@ -272,7 +272,7 @@ void clean_tables(
     int32_t i, count = ecs_sparse_count(world->store.tables);
 
     for (i = 0; i < count; i ++) {
-        ecs_table_t *t = ecs_sparse_get(world->store.tables, ecs_table_t, i);
+        ecs_table_t *t = ecs_sparse_get_dense(world->store.tables, ecs_table_t, i);
         ecs_table_free(world, t);
     }
 
@@ -319,7 +319,7 @@ ecs_world_t *ecs_mini(void) {
 
     world->type_info = ecs_sparse_new(ecs_type_info_t);
     world->id_index = ecs_map_new(ecs_id_record_t, 8);
-    world->id_triggers = ecs_map_new(ecs_id_trigger_t, 8);
+    world->event_triggers = ecs_sparse_new(ecs_event_triggers_t);
 
     world->aliases = NULL;
 
@@ -465,38 +465,6 @@ void on_demand_in_map_fini(
     ecs_map_free(map);
 }
 
-void ecs_notify_tables(
-    ecs_world_t *world,
-    ecs_id_t id,
-    ecs_table_event_t *event)
-{
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);
-
-    /* If no id is specified, broadcast to all tables */
-    if (!id) {
-        ecs_sparse_t *tables = world->store.tables;
-        int32_t i, count = ecs_sparse_count(tables);
-        for (i = 0; i < count; i ++) {
-            ecs_table_t *table = ecs_sparse_get(tables, ecs_table_t, i);
-            ecs_table_notify(world, table, event);
-        }
-
-    /* If id is specified, only broadcast to tables with id */
-    } else {
-        ecs_id_record_t *r = ecs_get_id_record(world, id);
-        if (!r) {
-            return;
-        }
-
-        ecs_table_record_t *tr;
-        ecs_map_iter_t it = ecs_map_iter(r->table_index);
-        while ((tr = ecs_map_next(&it, ecs_table_record_t, NULL))) {
-            ecs_table_notify(world, tr->table, event);
-        }
-    }
-}
-
 static
 void default_ctor(
     ecs_world_t *world, ecs_entity_t component, const ecs_entity_t *entity_ptr,
@@ -632,9 +600,8 @@ void ecs_set_component_actions_w_id(
          * as the component type or not. 
          * A more selective approach requires a more expressive notification
          * framework. */
-        ecs_notify_tables(world, 0, &(ecs_table_event_t) {
-            .kind = EcsTableComponentInfo,
-            .component = component
+        ecs_emit(world, &(ecs_event_desc_t) {EcsOnComponentLifecycle, 
+            &(ecs_ids_t){.array = &component, .count = 1}, EcsPayloadNone, { 0 }
         });
     }
 }
@@ -692,10 +659,11 @@ void fini_unset_tables(
 {
     int32_t i, count = ecs_sparse_count(world->store.tables);
     for (i = 0; i < count; i ++) {
-        ecs_table_t *table = ecs_sparse_get(world->store.tables, ecs_table_t, i);
-        ecs_data_t *data = ecs_table_get_data(table);
+        ecs_table_t *table = ecs_sparse_get_dense(world->store.tables, ecs_table_t, i);
         int32_t table_count = ecs_table_count(table);
-        ecs_notify(world, table, data, 0, table_count, EcsUnSet, NULL); 
+
+        ecs_emit(world, &(ecs_event_desc_t){EcsUnSet, NULL,
+            EcsPayloadTable, .payload.table = {table, 0, table_count} });
     }
 }
 
@@ -726,7 +694,7 @@ void fini_queries(
 {
     int32_t i, count = ecs_sparse_count(world->queries);
     for (i = 0; i < count; i ++) {
-        ecs_query_t *query = ecs_sparse_get(world->queries, ecs_query_t, 0);
+        ecs_query_t *query = ecs_sparse_get_dense(world->queries, ecs_query_t, 0);
         ecs_query_fini(query);
     }
     ecs_sparse_free(world->queries);
@@ -763,18 +731,26 @@ void fini_id_index(
 }
 
 static
-void fini_id_triggers(
+void fini_triggers(
     ecs_world_t *world)
 {
-    ecs_map_iter_t it = ecs_map_iter(world->id_triggers);
-    ecs_id_trigger_t *t;
-    while ((t = ecs_map_next(&it, ecs_id_trigger_t, NULL))) {
-        ecs_map_free(t->on_add_triggers);
-        ecs_map_free(t->on_remove_triggers);
-        ecs_map_free(t->on_set_triggers);
-        ecs_map_free(t->un_set_triggers);
+    ecs_sparse_t *triggers = world->event_triggers;
+    int32_t i, count = ecs_sparse_count(triggers);
+
+    for (i = 0; i < count; i ++) {
+        ecs_event_triggers_t *et = 
+            ecs_sparse_get_dense(triggers, ecs_event_triggers_t, i);
+        ecs_assert(et != NULL, ECS_INTERNAL_ERROR, NULL);
+
+        ecs_map_iter_t it = ecs_map_iter(et->triggers);
+        ecs_id_triggers_t *idt;
+        while ((idt = ecs_map_next(&it, ecs_id_triggers_t, NULL))) {
+            ecs_map_free(idt->triggers);
+        }
+        ecs_map_free(et->triggers);
     }
-    ecs_map_free(world->id_triggers);
+
+    ecs_sparse_free(world->event_triggers);
     ecs_sparse_free(world->triggers);
 }
 
@@ -836,7 +812,7 @@ int ecs_fini(
 
     fini_id_index(world);
 
-    fini_id_triggers(world);
+    fini_triggers(world);
 
     fini_aliases(world);
 
@@ -1045,7 +1021,7 @@ const ecs_type_info_t * ecs_get_c_info(
     ecs_assert(component != 0, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(!(component & ECS_ROLE_MASK), ECS_INTERNAL_ERROR, NULL);
 
-    return ecs_sparse_get_sparse(world->type_info, ecs_type_info_t, component);
+    return ecs_sparse_get(world->type_info, ecs_type_info_t, component);
 }
 
 ecs_type_info_t * ecs_get_or_create_c_info(
@@ -1224,33 +1200,12 @@ const ecs_world_info_t* ecs_get_world_info(
     return &world->stats;
 }
 
-void ecs_notify_queries(
-    ecs_world_t *world,
-    ecs_query_event_t *event)
-{
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INVALID_OPERATION, NULL); 
-
-    int32_t i, count = ecs_sparse_count(world->queries);
-    for (i = 0; i < count; i ++) {
-        ecs_query_notify(world, 
-            ecs_sparse_get(world->queries, ecs_query_t, i), event);
-    }    
-}
-
 void ecs_delete_table(
     ecs_world_t *world,
     ecs_table_t *table)
 {
     ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
     ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INVALID_OPERATION, NULL); 
-
-    /* Notify queries that table is to be removed */
-    ecs_notify_queries(
-        world, &(ecs_query_event_t){
-            .kind = EcsQueryTableUnmatch,
-            .table = table
-        });
 
     uint64_t id = table->id;
 

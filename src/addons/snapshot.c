@@ -188,7 +188,7 @@ void ecs_snapshot_restore(
     int32_t t, table_count = ecs_sparse_count(world->store.tables);
 
     for (t = 0; t < table_count; t ++) {
-        ecs_table_t *table = ecs_sparse_get(world->store.tables, ecs_table_t, t);
+        ecs_table_t *table = ecs_sparse_get_dense(world->store.tables, ecs_table_t, t);
 
         if (table->flags & EcsTableHasBuiltins) {
             continue;
@@ -232,14 +232,16 @@ void ecs_snapshot_restore(
                 data = ecs_table_merge(world, table, table, data, leaf->data);
 
                 /* Run OnSet systems for merged entities */
-                ecs_notify(
-                    world, table, data, old_count, new_count, EcsOnSet, NULL);
+                ecs_emit(world, &(ecs_event_desc_t){ EcsOnSet, NULL, 
+                    EcsPayloadTable, .payload.table = {
+                        table, .offset = old_count, .count = new_count
+                    } });
 
                 ecs_os_free(leaf->data->columns);
             } else {
                 ecs_table_replace_data(world, table, leaf->data);
             }
-            
+
             ecs_os_free(leaf->data);
             l ++;
         } else {
@@ -264,15 +266,16 @@ void ecs_snapshot_restore(
      * restoring safe */
     if (!is_filtered) {
         for (t = 0; t < table_count; t ++) {
-            ecs_table_t *table = ecs_sparse_get(world->store.tables, ecs_table_t, t);
+            ecs_table_t *table = ecs_sparse_get_dense(
+                world->store.tables, ecs_table_t, t);
             if (table->flags & EcsTableHasBuiltins) {
                 continue;
             }
-            
-            ecs_data_t *table_data = ecs_table_get_data(table);
-            int32_t entity_count = ecs_table_data_count(table_data);
-            ecs_notify(
-                world, table, table_data, 0, entity_count, EcsOnSet, NULL);         
+
+            int32_t entity_count = ecs_table_count(table);
+
+            ecs_emit(world, &(ecs_event_desc_t){EcsOnSet, NULL, 
+                EcsPayloadTable, .payload.table = {table, 0, entity_count} });       
         }
     }
 

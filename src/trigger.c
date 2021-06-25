@@ -16,75 +16,46 @@ int32_t count_events(
 } 
 
 static
-void register_id_trigger(
-    ecs_map_t *set,
-    ecs_trigger_t *trigger)
-{
-    ecs_trigger_t **t = ecs_map_ensure(set, ecs_trigger_t*, trigger->id);
-    ecs_assert(t != NULL, ECS_INTERNAL_ERROR, NULL);
-    *t = trigger;
-}
-
-static
-ecs_map_t* unregister_id_trigger(
-    ecs_map_t *set,
-    ecs_trigger_t *trigger)
-{
-    ecs_map_remove(set, trigger->id);
-
-    if (!ecs_map_count(set)) {
-        ecs_map_free(set);
-        return NULL;
-    }
-
-    return set;
-}
-
-static
 void register_trigger(
     ecs_world_t *world,
-    ecs_id_t id,
     ecs_trigger_t *trigger)
 {
     ecs_assert(world != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(trigger != NULL, ECS_INTERNAL_ERROR, NULL);
 
-    ecs_map_t *triggers = world->id_triggers;
+    ecs_sparse_t *triggers = world->event_triggers;
     ecs_assert(triggers != NULL, ECS_INTERNAL_ERROR, NULL);
-
-    ecs_id_trigger_t *idt = ecs_map_ensure(triggers, 
-        ecs_id_trigger_t, id);
-    ecs_assert(idt != NULL, ECS_INTERNAL_ERROR, NULL);
 
     int i;
     for (i = 0; i < trigger->event_count; i ++) {
-        ecs_map_t **set = NULL;
-        if (trigger->events[i] == EcsOnAdd) {
-            set = &idt->on_add_triggers;
-        } else if (trigger->events[i] == EcsOnRemove) {
-            set = &idt->on_remove_triggers;
-        } else if (trigger->events[i] == EcsOnSet) {
-            set = &idt->on_set_triggers;
-        } else if (trigger->events[i] == EcsUnSet) {
-            set = &idt->un_set_triggers;            
-        } else {
-            /* Invalid event provided */
-            ecs_abort(ECS_INVALID_PARAMETER, NULL);
+        ecs_entity_t event = trigger->events[i];
+
+        /* Get triggers for event */
+        ecs_event_triggers_t *evt = ecs_sparse_ensure(
+            triggers, ecs_event_triggers_t, event);
+        ecs_assert(evt != NULL, ECS_INTERNAL_ERROR, NULL);
+
+        if (!evt->triggers) {
+            evt->triggers = ecs_map_new(ecs_id_triggers_t, 1);
+        }
+        
+        /* Get triggers for (component) id */
+        ecs_id_triggers_t *idt = ecs_map_ensure(
+            evt->triggers, ecs_id_triggers_t, trigger->term.id);
+        ecs_assert(idt != NULL, ECS_INTERNAL_ERROR, NULL);
+
+        if (!idt->triggers) {
+            idt->triggers = ecs_set_new(1);
+
+            /* First trigger of its kind, notify */
+            ecs_emit(world, &(ecs_event_desc_t){ .event = EcsOnCreateTrigger,
+                .ids = &(ecs_ids_t){.array = &trigger->term.id, .count = 1},
+                .payload_kind = EcsPayloadEntity, 
+                .payload.entity = trigger->entity 
+            });
         }
 
-        ecs_assert(set != NULL, ECS_INTERNAL_ERROR, NULL);
-
-        if (!*set) {
-            *set = ecs_map_new(ecs_trigger_t*, 1);
-
-            // First trigger of its kind, send table notification
-            ecs_notify_tables(world, id, &(ecs_table_event_t){
-                .kind = EcsTableTriggerMatch,
-                .event = trigger->events[i]
-            });            
-        }
-
-        register_id_trigger(*set, trigger);
+        ecs_set_ensure(idt->triggers, trigger->id);
     }
 }
 
@@ -93,39 +64,33 @@ void unregister_trigger(
     ecs_world_t *world,
     ecs_trigger_t *trigger)
 {
-    ecs_assert(world != NULL, ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(trigger != NULL, ECS_INTERNAL_ERROR, NULL);
-
-    ecs_map_t *triggers = world->id_triggers;
+    ecs_sparse_t *triggers = world->event_triggers;
     ecs_assert(triggers != NULL, ECS_INTERNAL_ERROR, NULL);
-
-    ecs_id_trigger_t *idt = ecs_map_get(
-        triggers, ecs_id_trigger_t, trigger->id);
-    if (!idt) {
-        return;
-    }
 
     int i;
     for (i = 0; i < trigger->event_count; i ++) {
-        ecs_map_t **set = NULL;
-        if (trigger->events[i] == EcsOnAdd) {
-            set = &idt->on_add_triggers;
-        } else if (trigger->events[i] == EcsOnRemove) {
-            set = &idt->on_remove_triggers;
-        } else if (trigger->events[i] == EcsOnSet) {
-            set = &idt->on_set_triggers;
-        } else if (trigger->events[i] == EcsUnSet) {
-            set = &idt->un_set_triggers;            
-        } else {
-            /* Invalid event provided */
-            ecs_abort(ECS_INVALID_PARAMETER, NULL);
-        }
-        if (!*set) {
-            return;
-        }
+        ecs_entity_t event = trigger->events[i];
 
-        *set = unregister_id_trigger(*set, trigger);                
-    }  
+        /* Get triggers for event */
+        ecs_event_triggers_t *evt = ecs_sparse_get(
+            triggers, ecs_event_triggers_t, event);
+        ecs_assert(evt != NULL, ECS_INTERNAL_ERROR, NULL);
+
+        /* Get triggers for (component) id */
+        ecs_id_triggers_t *idt = ecs_map_get(
+            evt->triggers, ecs_id_triggers_t, trigger->term.id);
+        ecs_assert(idt != NULL, ECS_INTERNAL_ERROR, NULL);
+
+        ecs_map_remove(idt->triggers, trigger->id);
+        if (!ecs_map_count(idt->triggers)) {
+            ecs_map_free(idt->triggers);
+            ecs_map_remove(evt->triggers, trigger->term.id);
+            if (!ecs_map_count(evt->triggers)) {
+                ecs_map_free(evt->triggers);
+                evt->triggers = NULL;
+            }
+        }
+    }
 }
 
 ecs_map_t* ecs_triggers_get(
@@ -136,31 +101,34 @@ ecs_map_t* ecs_triggers_get(
     ecs_assert(world != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_assert(id != 0, ECS_INTERNAL_ERROR, NULL);
 
-    ecs_map_t *triggers = world->id_triggers;
+    ecs_sparse_t *triggers = world->event_triggers;
     ecs_assert(triggers != NULL, ECS_INTERNAL_ERROR, NULL);
 
-    ecs_id_trigger_t *idt = ecs_map_get(triggers, ecs_id_trigger_t, id);
+    ecs_event_triggers_t *evt = ecs_sparse_get(
+        triggers, ecs_event_triggers_t, event);
+    if (!evt) {
+        return NULL;
+    }
+
+    if (!evt->triggers) {
+        return NULL;
+    }
+
+    ecs_id_triggers_t *idt = ecs_map_get(evt->triggers, ecs_id_triggers_t, id);
     if (!idt) {
         return NULL;
     }
 
-    ecs_map_t *set = NULL;
-
-    if (event == EcsOnAdd) {
-        set = idt->on_add_triggers;
-    } else if (event == EcsOnRemove) {
-        set = idt->on_remove_triggers;
-    } else if (event == EcsOnSet) {
-        set = idt->on_set_triggers;
-    } else if (event == EcsUnSet) {
-        set = idt->un_set_triggers;
-    }
-
-    if (ecs_map_count(set)) {
-        return set;
-    } else {
+    ecs_map_t *set = idt->triggers;
+    if (!set) {
         return NULL;
     }
+
+    if (!ecs_map_count(set)) {
+        return NULL;
+    }
+
+    return set;
 }
 
 static
@@ -191,10 +159,10 @@ void notify_trigger_set(
     ecs_assert(index >= 0, ECS_INTERNAL_ERROR, NULL);
     index ++;
 
-    ecs_entity_t ids[1] = { id };
+    ecs_id_t ids[1] = { id };
     int32_t type_map[1] = { 0 };
     void *columns[1] = { NULL };
-    size_t sizes[1] = { 0 };
+    ecs_size_t sizes[1] = { 0 };
 
     /* If there is no data, ensure that system won't try to get it */
     if (table->column_count < index) {
@@ -346,7 +314,7 @@ ecs_entity_t ecs_trigger_init(
         /* Trigger must have at least one event */
         ecs_assert(trigger->event_count != 0, ECS_INVALID_PARAMETER, NULL);
 
-        register_trigger(world, trigger->term.id, trigger);
+        register_trigger(world, trigger);
 
         ecs_term_fini(&term);        
     } else {
