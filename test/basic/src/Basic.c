@@ -1,7 +1,7 @@
 #include <basic.h>
 
 void Basic_world() {
-    ecs_world_t *world = ecs_init();
+    ecs_world_t *world = ecs_mini();
     test_assert(world != NULL);
     ecs_fini(world);
 }

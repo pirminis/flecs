@@ -186,13 +186,16 @@ void dtor_all_components(
     int32_t count)
 {
     ecs_entity_t *entities = ecs_vector_first(data->entities, ecs_entity_t);
+    ecs_type_info_t **type_info = table->c_info;
+    if (!type_info) {
+        return;
+    }
+
     int32_t column_count = table->column_count;
     int32_t i;
     for (i = 0; i < column_count; i ++) {
         ecs_column_t *column = &data->columns[i];
-        dtor_component(
-            world, table->c_info[i], column, entities, row, 
-            count);
+        dtor_component(world, type_info[i], column, entities, row, count);
     }
 }
 
@@ -317,6 +320,9 @@ void ecs_table_free(
     ecs_world_t *world,
     ecs_table_t *table)
 {
+    ecs_object_assert(world, ecs_world_t);
+    ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);
+
     /* Cannot free a table while it's locked */
     ecs_assert(!table->lock, ECS_LOCKED_STORAGE, NULL);
 
@@ -1729,7 +1735,7 @@ void ecs_table_lock(
     ecs_world_t *world,
     ecs_table_t *table)
 {
-    if (world->magic == ECS_WORLD_MAGIC && !world->is_readonly) {
+    if (ecs_object_is(world, ecs_world_t) && !world->is_readonly) {
         table->lock ++;
     }
 }
@@ -1738,7 +1744,7 @@ void ecs_table_unlock(
     ecs_world_t *world,
     ecs_table_t *table)
 {
-    if (world->magic == ECS_WORLD_MAGIC && !world->is_readonly) {
+    if (ecs_object_is(world, ecs_world_t) && !world->is_readonly) {
         table->lock --;
         ecs_assert(table->lock >= 0, ECS_INVALID_OPERATION, NULL);
     }

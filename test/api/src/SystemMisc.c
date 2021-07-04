@@ -801,7 +801,7 @@ void SystemMisc_dont_enable_after_rematch() {
     ECS_ENTITY(world, Entity, INSTANCEOF | Prefab);
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);
+    ecs_set_ctx(world, &ctx);
 
     /* System is enabled but doesn't match with any entities */
     
@@ -1843,7 +1843,7 @@ void SystemMisc_activate_system_for_table_w_n_pairs() {
     ECS_TYPE(world, Type, PAIR | Pair > TagA, PAIR | Pair > TagB);
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);    
+    ecs_set_ctx(world, &ctx);    
 
     ecs_entity_t e = ecs_new(world, Type);
     test_assert(e != 0);

@@ -226,6 +226,14 @@ void ecs_sparse_memory(
     int32_t *allocd,
     int32_t *used);
 
+FLECS_DBG_API
+ecs_sparse_iter_t _ecs_sparse_iter(
+    ecs_sparse_t *sparse,
+    ecs_size_t elem_size);
+
+#define ecs_sparse_iter(sparse, T)\
+    _ecs_sparse_iter(sparse, ECS_SIZEOF(T))
+
 #ifndef FLECS_LEGACY
 #define ecs_sparse_each(sparse, T, var, ...)\
     {\

@@ -48,7 +48,7 @@ void SystemManual_1_type_1_component() {
     
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);
+    ecs_set_ctx(world, &ctx);
 
     ecs_run(world, Iter, 1, NULL);
 

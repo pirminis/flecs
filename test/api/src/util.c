@@ -53,7 +53,7 @@ void probe_system_w_ctx(
 void probe_system(
     ecs_iter_t *it) 
 {
-    Probe *ctx = ecs_get_context(it->world);
+    Probe *ctx = ecs_get_ctx(it->world);
     probe_system_w_ctx(it, ctx);
 }
 

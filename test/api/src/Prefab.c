@@ -722,7 +722,7 @@ void Prefab_iterate_w_prefab_field() {
     ecs_set(world, e1, Position, {0, 0});
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);
+    ecs_set_ctx(world, &ctx);
 
     ecs_progress(world, 1);
 
@@ -791,7 +791,7 @@ void Prefab_iterate_w_prefab_shared() {
     ecs_set(world, e1, Position, {0, 0});
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);
+    ecs_set_ctx(world, &ctx);
 
     ecs_progress(world, 1);
 
@@ -834,7 +834,7 @@ void Prefab_match_entity_prefab_w_system_optional() {
     ecs_set(world, e1, Position, {0, 0});
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);
+    ecs_set_ctx(world, &ctx);
 
     ecs_progress(world, 1);
 
@@ -891,7 +891,7 @@ void Prefab_prefab_in_system_expr() {
     ecs_set(world, e3, Mass, {0});
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);
+    ecs_set_ctx(world, &ctx);
 
     ecs_progress(world, 1);
 
@@ -939,7 +939,7 @@ void Prefab_dont_match_prefab() {
     ECS_SYSTEM(world, Dummy, EcsOnUpdate, Position);
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);
+    ecs_set_ctx(world, &ctx);
 
     ecs_progress(world, 1);
 
@@ -1673,7 +1673,7 @@ void Prefab_on_set_on_instance() {
 void InstantiateInProgress(ecs_iter_t *it) {
     ECS_COLUMN_ENTITY(it, Prefab, 2);
 
-    ecs_entity_t *ids = ecs_get_context(it->world);
+    ecs_entity_t *ids = ecs_get_ctx(it->world);
 
     int i;
     for (i = 0; i < it->count; i ++) {
@@ -1696,7 +1696,7 @@ void Prefab_instantiate_in_progress() {
     test_assert(dummy_ids != NULL);
 
     ecs_entity_t ids[10];
-    ecs_set_context(world, ids);
+    ecs_set_ctx(world, ids);
 
     ecs_progress(world, 1);
 
@@ -1716,7 +1716,7 @@ void Prefab_instantiate_in_progress() {
 void NewInProgress(ecs_iter_t *it) {
     ECS_COLUMN_COMPONENT(it, Type, 2);
 
-    ecs_entity_t *ids = ecs_get_context(it->world);
+    ecs_entity_t *ids = ecs_get_ctx(it->world);
 
     int i;
     for (i = 0; i < it->count; i ++) {
@@ -1738,7 +1738,7 @@ void Prefab_copy_from_prefab_in_progress() {
     ECS_SYSTEM(world, NewInProgress, EcsOnUpdate, Position, :Type);
 
     ecs_entity_t ids[10];
-    ecs_set_context(world, ids);
+    ecs_set_ctx(world, ids);
 
     const ecs_entity_t *dummy_ids = ecs_bulk_new(world, Position, 10);
     test_assert(dummy_ids != NULL);
@@ -1776,7 +1776,7 @@ void Prefab_copy_from_prefab_first_instance_in_progress() {
     ECS_SYSTEM(world, NewInProgress, EcsOnUpdate, Position, :Type);
 
     ecs_entity_t ids[10];
-    ecs_set_context(world, ids);
+    ecs_set_ctx(world, ids);
 
     const ecs_entity_t *dummy_ids = ecs_bulk_new(world, Position, 10);
     test_assert(dummy_ids != NULL);
@@ -2025,7 +2025,7 @@ void Prefab_no_instantiate_on_2nd_add_in_progress() {
 }
 
 void NewPrefab_w_count(ecs_iter_t *it) {
-    ecs_entity_t *ids = ecs_get_context(it->world);
+    ecs_entity_t *ids = ecs_get_ctx(it->world);
     ECS_COLUMN_ENTITY(it, Prefab, 1);
     const ecs_entity_t *new_ids = ecs_bulk_new_w_entity(it->world, ecs_pair(EcsIsA, Prefab), 3);
     test_assert(new_ids != NULL);
@@ -2048,7 +2048,7 @@ void Prefab_nested_prefab_in_progress_w_count() {
     ECS_SYSTEM(world, NewPrefab_w_count, EcsOnUpdate, :Prefab);
 
     ecs_entity_t ids[3] = {0};
-    ecs_set_context(world, ids);
+    ecs_set_ctx(world, ids);
 
     ecs_progress(world, 1);
 
@@ -2109,7 +2109,7 @@ void Prefab_nested_prefab_in_progress_w_count_set_after_override() {
     ECS_SYSTEM(world, OnSetVelocity, EcsOnSet, Velocity);
 
     ecs_entity_t ids[3] = {0};
-    ecs_set_context(world, ids);
+    ecs_set_ctx(world, ids);
 
     ecs_progress(world, 1);
 
@@ -2291,7 +2291,7 @@ void Prefab_rematch_twice() {
     ECS_ENTITY(world, Entity, INSTANCEOF | Prefab);
 
     Probe ctx = {0};
-    ecs_set_context(world, &ctx);
+    ecs_set_ctx(world, &ctx);
 
     ecs_progress(world, 1);
     test_int(ctx.count, 0);
@@ -2315,7 +2315,7 @@ static
 void AddPosition(ecs_iter_t *it) {
     ECS_COLUMN_COMPONENT(it, Position, 1);
     
-    ecs_entity_t *base = ecs_get_context(it->world);
+    ecs_entity_t *base = ecs_get_ctx(it->world);
 
     ecs_add(it->world, *base, Position);
 }
@@ -2331,7 +2331,7 @@ void Prefab_add_to_empty_base_in_system() {
 
     ECS_SYSTEM(world, AddPosition, EcsOnUpdate, :Position);
 
-    ecs_set_context(world, &base);
+    ecs_set_ctx(world, &base);
 
     ecs_progress(world, 1);
 

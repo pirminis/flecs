@@ -91,6 +91,7 @@ bool ecs_identifier_is_var(
 #define ECS_MISSING_OS_API (9)
 #define ECS_THREAD_ERROR (10)
 #define ECS_CYCLE_DETECTED (11)
+#define ECS_RETRIGGER_UNSUPPORTED (12)
 
 #define ECS_INCONSISTENT_NAME (20)
 #define ECS_NAME_IN_USE (21)

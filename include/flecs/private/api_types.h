@@ -42,10 +42,32 @@ typedef struct ecs_sparse_t ecs_sparse_t;
 /* Switch list */
 typedef struct ecs_switch_t ecs_switch_t;
 
+/* Mixins */
+typedef struct ecs_mixins_t ecs_mixins_t;
+
 ////////////////////////////////////////////////////////////////////////////////
 //// Non-opaque types
 ////////////////////////////////////////////////////////////////////////////////
 
+/* Object header */
+typedef struct ecs_header_t {
+    int32_t magic; /* Magic number verifying it's a flecs object */
+    int32_t type;  /* Magic number indicating which type of flecs object */
+    ecs_mixins_t *mixins; /* Offset table to optional mixins */
+} ecs_header_t;
+
+/** Mixin for emitting events to triggers/observers */
+struct ecs_observable_t {
+    ecs_sparse_t *triggers;  /* sparse<event, ecs_event_triggers_t> */
+};
+
+/** Mixin for iteratable objects */
+typedef struct ecs_iterable_t {
+    ecs_iter_create_action_t iter;
+    ecs_iter_next_action_t next;
+} ecs_iterable_t;
+
+/* Entity record */
 struct ecs_record_t {
     ecs_table_t *table;  /* Identifies a type (and table) in world */
     int32_t row;         /* Table row of the entity */
@@ -120,12 +142,21 @@ typedef struct ecs_query_iter_t {
     int32_t bitset_first;
 } ecs_query_iter_t;  
 
-/** Query-iterator specific data */
+/** Snapshot-iterator specific data */
 typedef struct ecs_snapshot_iter_t {
     ecs_filter_t filter;
     ecs_vector_t *tables; /* ecs_table_leaf_t */
     int32_t index;
 } ecs_snapshot_iter_t;
+
+/** Type used for iterating ecs_sparse_t */
+typedef struct ecs_sparse_iter_t {
+    ecs_sparse_t *sparse;
+    const uint64_t *ids;
+    ecs_size_t size;
+    int32_t i;
+    int32_t count;
+} ecs_sparse_iter_t;
 
 /* Number of terms for which iterator can store data without allocations */
 #define ECS_ITER_TERM_STORAGE_SIZE (8)
@@ -139,6 +170,8 @@ typedef struct ecs_iter_private_t {
         ecs_filter_iter_t filter;
         ecs_query_iter_t query;
         ecs_snapshot_iter_t snapshot;
+        ecs_map_iter_t map;
+        ecs_sparse_iter_t sparse;
     } iter;
 
     /* Arrays for avoiding allocations below ITER_TERM_STORAGE_SIZE terms */

@@ -241,7 +241,7 @@ void ecs_enable(
     ecs_entity_t entity,
     bool enabled)
 {
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INVALID_PARAMETER, NULL);
+    ecs_object_assert(world, ecs_world_t);
 
     const EcsType *type_ptr = ecs_get( world, entity, EcsType);
     if (type_ptr) {
@@ -550,7 +550,7 @@ ecs_entity_t ecs_system_init(
     ecs_world_t *world,
     const ecs_system_desc_t *desc)
 {
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INVALID_FROM_WORKER, NULL);
+    ecs_object_assert(world, ecs_world_t);
     ecs_assert(!world->is_readonly, ECS_INVALID_WHILE_ITERATING, NULL);
 
     ecs_entity_t existing = desc->entity.entity;

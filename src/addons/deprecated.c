@@ -162,8 +162,7 @@ void ecs_dim_type(
     ecs_type_t type,
     int32_t entity_count)
 {
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INVALID_PARAMETER, NULL);
+    ecs_object_assert(world, ecs_world_t);
     if (type) {
         ecs_table_t *table = ecs_table_from_type(world, type);
         ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);

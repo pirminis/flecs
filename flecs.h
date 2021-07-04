@@ -158,7 +158,17 @@ typedef uint64_t ecs_flags64_t;
 /* Keep unsigned integers out of the codebase as they do more harm than good */
 typedef int32_t ecs_size_t;
 
+/* Abstraction on top of C-style casts so that C functions can be used in C++
+ * code without generating warnings */
+#ifndef __cplusplus
+#define ECS_CAST(T, V) ((T)(V))
+#else
+#define ECS_CAST(T, V) (static_cast<T>(V))
+#endif
+
+/* Versions of sizeof and offsetof that use ecs_size_t */
 #define ECS_SIZEOF(T) ECS_CAST(ecs_size_t, sizeof(T))
+#define ECS_OFFSETOF(T, M), ECS_CAST(ecs_size_t, offsetof(T))
 
 /* Use alignof in C++, or a trick in C. */
 #ifdef __cplusplus
@@ -194,14 +204,6 @@ typedef int32_t ecs_size_t;
 /* Simple utility for determining the max of two values */
 #define ECS_MAX(a, b) ((a > b) ? a : b)
 
-/* Abstraction on top of C-style casts so that C functions can be used in C++
- * code without producing warnings */
-#ifndef __cplusplus
-#define ECS_CAST(T, V) ((T)(V))
-#else
-#define ECS_CAST(T, V) (static_cast<T>(V))
-#endif
-
 ////////////////////////////////////////////////////////////////////////////////
 //// Reserved component ids
 ////////////////////////////////////////////////////////////////////////////////
@@ -210,21 +212,22 @@ typedef int32_t ecs_size_t;
 #define FLECS__EEcsComponent (1)
 #define FLECS__EEcsComponentLifecycle (2)
 #define FLECS__EEcsType (3)
-#define FLECS__EEcsName (6)
+#define FLECS__EEcsName (4)
+#define FLECS__EEcsTrigger (5)
+#define FLECS__EEcsQuery (6)
+#define FLECS__EEcsObserver (7)
+#define FLECS__EEcsIterable (8)
 
-/** System module component ids */
-#define FLECS__EEcsTrigger (4)
-#define FLECS__EEcsObserver (11)
-#define FLECS__EEcsSystem (5)
-#define FLECS__EEcsTickSource (7)
-#define FLECS__EEcsQuery (10)
+/* System module component ids */
+#define FLECS__EEcsSystem (10)
+#define FLECS__EEcsTickSource (11)
 
 /** Pipeline module component ids */
-#define FLECS__EEcsPipelineQuery (13)
+#define FLECS__EEcsPipelineQuery (12)
 
 /** Timer module component ids */
-#define FLECS__EEcsTimer (14)
-#define FLECS__EEcsRateFilter (15)
+#define FLECS__EEcsTimer (13)
+#define FLECS__EEcsRateFilter (14)
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1189,32 +1192,6 @@ private:
 
 #endif
 /**
- * @file map.h
- * @brief Set datastructure.
- *
- * Same as map, but with no payload.
- */
-
-#ifndef FLECS_SET_H
-#define FLECS_SET_H
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define ecs_set_new(elem_count)\
-    _ecs_map_new(0, 0, elem_count)
-
-#define ecs_set_ensure(set, key)\
-    _ecs_map_ensure(set, 0, key)
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
-/**
  * @file strbuf.h
  * @brief Utility for constructing strings.
  *
@@ -1834,6 +1811,12 @@ extern "C" {
  * @{
  */
 
+/** An object. An object can be anything that the API creates and returns as a
+ * pointer. The validity of objects is checked at runtime. The object 
+ * abstraction is used to implement common functionality (mixins) once, with
+ * additional benefits such as runtime object inspection. */
+typedef void ecs_object_t;
+
 /** An id. Ids are the things that can be added to an entity. An id can be an
  * entity or pair, and can have an optional role. */
 typedef uint64_t ecs_id_t;
@@ -1858,6 +1841,9 @@ typedef struct ecs_trigger_t ecs_trigger_t;
 
 /** An observer reacts to events matching multiple filter terms */
 typedef struct ecs_observer_t ecs_observer_t;
+
+/** An observable contains lists of triggers for specific events/components */
+typedef struct ecs_observable_t ecs_observable_t;
 
 /* An iterator lets an application iterate entities across tables. */
 typedef struct ecs_iter_t ecs_iter_t;
@@ -1895,6 +1881,9 @@ typedef struct ecs_ref_t ecs_ref_t;
 typedef void (*ecs_iter_action_t)(
     ecs_iter_t *it);
 
+typedef void (*ecs_iter_create_action_t)(
+    ecs_object_t *iterable, ecs_iter_t *it);
+
 typedef bool (*ecs_iter_next_action_t)(
     ecs_iter_t *it);  
 
@@ -1931,7 +1920,7 @@ typedef int (*ecs_compare_action_t)(
     ecs_entity_t e1,
     const void *ptr1,
     ecs_entity_t e2,
-    const void *ptr2);  
+    const void *ptr2);
 
 /** @} */
 
@@ -2064,6 +2053,7 @@ struct ecs_trigger_t {
     ecs_ctx_free_t binding_ctx_free; /* Callback to free binding_ctx */
     
     ecs_entity_t entity;        /* Entity associated with trigger */
+    ecs_observable_t *observable; /* Observable for trigger */
 
     uint64_t id;                /* Internal id */
 };
@@ -2085,10 +2075,11 @@ struct ecs_observer_t {
     void *ctx;                  /* Callback context */
     void *binding_ctx;          /* Binding context (for language bindings) */
 
-    ecs_ctx_free_t ctx_free;    /* Callback to free ctx */
+    ecs_ctx_free_t ctx_free;         /* Callback to free ctx */
     ecs_ctx_free_t binding_ctx_free; /* Callback to free binding_ctx */
     
     ecs_entity_t entity;        /* Entity associated with observer */
+    ecs_observable_t *observable; /* Observable for trigger */
 
     uint64_t id;                /* Internal id */    
 };
@@ -2139,10 +2130,32 @@ typedef struct ecs_sparse_t ecs_sparse_t;
 /* Switch list */
 typedef struct ecs_switch_t ecs_switch_t;
 
+/* Mixins */
+typedef struct ecs_mixins_t ecs_mixins_t;
+
 ////////////////////////////////////////////////////////////////////////////////
 //// Non-opaque types
 ////////////////////////////////////////////////////////////////////////////////
 
+/* Object header */
+typedef struct ecs_header_t {
+    int32_t magic; /* Magic number verifying it's a flecs object */
+    int32_t type;  /* Magic number indicating which type of flecs object */
+    ecs_mixins_t *mixins; /* Offset table to optional mixins */
+} ecs_header_t;
+
+/** Mixin for emitting events to triggers/observers */
+struct ecs_observable_t {
+    ecs_sparse_t *triggers;  /* sparse<event, ecs_event_triggers_t> */
+};
+
+/** Mixin for iteratable objects */
+typedef struct ecs_iterable_t {
+    ecs_iter_create_action_t iter;
+    ecs_iter_next_action_t next;
+} ecs_iterable_t;
+
+/* Entity record */
 struct ecs_record_t {
     ecs_table_t *table;  /* Identifies a type (and table) in world */
     int32_t row;         /* Table row of the entity */
@@ -2217,12 +2230,21 @@ typedef struct ecs_query_iter_t {
     int32_t bitset_first;
 } ecs_query_iter_t;  
 
-/** Query-iterator specific data */
+/** Snapshot-iterator specific data */
 typedef struct ecs_snapshot_iter_t {
     ecs_filter_t filter;
     ecs_vector_t *tables; /* ecs_table_leaf_t */
     int32_t index;
 } ecs_snapshot_iter_t;
+
+/** Type used for iterating ecs_sparse_t */
+typedef struct ecs_sparse_iter_t {
+    ecs_sparse_t *sparse;
+    const uint64_t *ids;
+    ecs_size_t size;
+    int32_t i;
+    int32_t count;
+} ecs_sparse_iter_t;
 
 /* Number of terms for which iterator can store data without allocations */
 #define ECS_ITER_TERM_STORAGE_SIZE (8)
@@ -2236,6 +2258,8 @@ typedef struct ecs_iter_private_t {
         ecs_filter_iter_t filter;
         ecs_query_iter_t query;
         ecs_snapshot_iter_t snapshot;
+        ecs_map_iter_t map;
+        ecs_sparse_iter_t sparse;
     } iter;
 
     /* Arrays for avoiding allocations below ITER_TERM_STORAGE_SIZE terms */
@@ -2437,6 +2461,7 @@ bool ecs_identifier_is_var(
 #define ECS_MISSING_OS_API (9)
 #define ECS_THREAD_ERROR (10)
 #define ECS_CYCLE_DETECTED (11)
+#define ECS_RETRIGGER_UNSUPPORTED (12)
 
 #define ECS_INCONSISTENT_NAME (20)
 #define ECS_NAME_IN_USE (21)
@@ -2879,13 +2904,8 @@ typedef struct ecs_query_desc_t {
      * will not be grouped. */
     ecs_rank_type_action_t group_by;
 
-    /* If set, the query will be created as a subquery. A subquery matches at
-     * most a subset of its parent query. Subqueries do not directly receive
-     * (table) notifications from the world. Instead parent queries forward
-     * results to subqueries. This can improve matching performance, as fewer
-     * queries need to be matched with new tables.
-     * Subqueries can be nested. */
-    ecs_query_t *parent;
+    /* Query parent (must be either world or query) */
+    ecs_object_t *parent;
 
     /* INTERNAL PROPERTY - system to be associated with query. Do not set, as 
      * this will change in future versions. */
@@ -2905,11 +2925,15 @@ typedef struct ecs_trigger_desc_t {
      * the term field is ignored. */
     const char *expr;
 
-    /* Events to trigger on (OnAdd, OnRemove, OnSet, UnSet) */
+    /* Events to trigger on */
     ecs_entity_t events[ECS_TRIGGER_DESC_EVENT_COUNT_MAX];
 
     /* Callback to invoke on an event */
     ecs_iter_action_t callback;
+
+    /* Trigger on events that occurred prior to creation of trigger. Only 
+     * supported for events with the Iterable component. */
+    bool retrigger;
 
     /* User context to pass to callback */
     void *ctx;
@@ -2922,6 +2946,9 @@ typedef struct ecs_trigger_desc_t {
 
     /* Callback to free binding_ctx */     
     ecs_ctx_free_t binding_ctx_free;
+
+    /* Observable with which to register the trigger */
+    ecs_object_t *observable;
 } ecs_trigger_desc_t;
 
 
@@ -2949,7 +2976,10 @@ typedef struct ecs_observer_desc_t {
     ecs_ctx_free_t ctx_free;
 
     /* Callback to free binding_ctx */     
-    ecs_ctx_free_t binding_ctx_free;    
+    ecs_ctx_free_t binding_ctx_free; 
+
+    /* Observable with which to register the observer */
+    ecs_object_t *observable;       
 } ecs_observer_desc_t;
 
 /** @} */
@@ -3018,6 +3048,9 @@ typedef struct EcsObserver {
 typedef struct EcsQuery {
     ecs_query_t *query;
 } EcsQuery;
+
+/** Component for iterable entities */
+typedef ecs_iterable_t EcsIterable;
 
 /** @} */
 
@@ -3896,6 +3929,9 @@ FLECS_API extern const ecs_entity_t EcsOnCreateTrigger;
 /* Event. Triggers when a trigger is deleted. */
 FLECS_API extern const ecs_entity_t EcsOnDeleteTrigger;
 
+/* Event. Triggers when observable is deleted. */
+FLECS_API extern const ecs_entity_t EcsOnDeleteObservable;
+
 /* Event. Triggers when lifecycle methods for a component are registered */
 FLECS_API extern const ecs_entity_t EcsOnComponentLifecycle;
 
@@ -4107,6 +4143,69 @@ FLECS_API extern const ecs_entity_t EcsPostFrame;
 /** @} */
 
 /**
+ * @defgroup objects Object API
+ * @brief All pointers created by the API are flecs objects. These functions
+ *        obtain generic properties (mixins) from a flecs object. Not all mixins
+ *        are available for every object. When a mixin is not available, a
+ *        runtime error will be thrown.
+ * @{
+ */
+
+/** Get world from object.
+ * @param object An object.
+ * @return The world.
+ */
+FLECS_API
+const ecs_world_t* ecs_get_world(
+    const ecs_object_t *world);
+
+/** Set context.
+ * This operation allows an application to register custom data with an object.
+ *
+ * @param object The object.
+ * @param ctx A pointer to a user defined value.
+ */
+FLECS_API
+void ecs_set_ctx(
+    ecs_object_t *object,
+    void *ctx);
+
+/** Get context.
+ * This operation retrieves a previously set context from an object.
+ *
+ * @param object The object.
+ * @return The context set with ecs_set_ctx. If no context was set, the
+ *         function returns NULL.
+ */
+FLECS_API
+void* ecs_get_ctx(
+    const ecs_object_t *object);
+
+/** Set binding context.
+ * Same as ecs_set_ctx but for context required by language bindings.
+ *
+ * @param object The object.
+ * @param ctx A pointer to a user defined value.
+ */
+FLECS_API
+void ecs_set_binding_ctx(
+    ecs_object_t *object,
+    void *ctx);
+
+/** Get binding context.
+ * Same as ecs_get_ctx but for context required by language bindings.
+ *
+ * @param object The object.
+ * @return The context set with ecs_set_binding_ctx. If no context was set, the
+ *         function returns NULL.
+ */
+FLECS_API
+void* ecs_get_binding_ctx(
+    const ecs_object_t *object);
+
+/** @} */
+
+/**
  * @defgroup world_api World API
  * @{
  */
@@ -4212,29 +4311,6 @@ void ecs_set_component_actions_w_id(
 #define ecs_set_component_actions(world, component, ...)\
     ecs_set_component_actions_w_id(world, ecs_id(component), &(EcsComponentLifecycle)__VA_ARGS__)
 #endif
-
-/** Set a world context.
- * This operation allows an application to register custom data with a world
- * that can be accessed anywhere where the application has the world object.
- *
- * @param world The world.
- * @param ctx A pointer to a user defined structure.
- */
-FLECS_API
-void ecs_set_context(
-    ecs_world_t *world,
-    void *ctx);
-
-/** Get the world context.
- * This operation retrieves a previously set world context.
- *
- * @param world The world.
- * @return The context set with ecs_set_context. If no context was set, the
- *         function returns NULL.
- */
-FLECS_API
-void* ecs_get_context(
-    const ecs_world_t *world);
 
 /** Get world info.
  *
@@ -6344,7 +6420,7 @@ bool ecs_query_orphaned(
 
 
 /**
- * @defgroup trigger Triggers
+ * @defgroup events Events
  */
 
 /** Create trigger.
@@ -6366,40 +6442,6 @@ ecs_entity_t ecs_trigger_init(
     ecs_world_t *world,
     const ecs_trigger_desc_t *desc);
 
-/** Get trigger context.
- * This operation returns the context pointer set for the trigger. If
- * the provided entity is not a trigger, the function will return NULL.
- *
- * @param world The world.
- * @param trigger The trigger from which to obtain the context.
- * @return The context.
- */
-FLECS_API
-void* ecs_get_trigger_ctx(
-    const ecs_world_t *world,
-    ecs_entity_t trigger);
-
-/** Same as ecs_get_trigger_ctx, but for binding ctx. 
- * The binding context is a context typically used to attach any language 
- * binding specific data that is needed when invoking a callback that is 
- * implemented in another language.
- * 
- * @param world The world.
- * @param trigger The trigger from which to obtain the context.
- * @return The context.
- */
-FLECS_API
-void* ecs_get_trigger_binding_ctx(
-    const ecs_world_t *world,
-    ecs_entity_t trigger);
-
-/** @} */
-
-
-/**
- * @defgroup observer Observers
- */
-
 /** Create observer.
  * Observers are like triggers, but can subscribe for multiple terms. An 
  * observer only triggers when the source of the event meets all terms.
@@ -6414,22 +6456,15 @@ ecs_entity_t ecs_observer_init(
     ecs_world_t *world,
     const ecs_observer_desc_t *desc);
 
-FLECS_API
-void* ecs_get_observer_ctx(
-    const ecs_world_t *world,
-    ecs_entity_t observer);
-
-FLECS_API
-void* ecs_get_observer_binding_ctx(
-    const ecs_world_t *world,
-    ecs_entity_t observer);
-
-/** @} */
-
-
-/**
- * @defgroup notifications Notifications
+/** Initialize observable.
  */
+void ecs_observable_init(
+    ecs_observable_t *observable);
+
+/** Deinitialize observable.
+ */
+void ecs_observable_fini(
+    ecs_observable_t *observable);
 
 typedef enum ecs_payload_kind_t {
     EcsPayloadNone,
@@ -6453,6 +6488,10 @@ typedef struct ecs_event_desc_t {
             void *param;
         } user;
     } payload;
+
+    /* Observable for which to notify the triggers/observers. If NULL, the
+     * world will be used as observable. */
+    ecs_object_t *observable;
 } ecs_event_desc_t;
 
 /** Send event.
@@ -6462,6 +6501,7 @@ void ecs_emit(
     ecs_event_desc_t *desc);
 
 /** @} */
+
 
 /**
  * @defgroup iterator Iterators
@@ -6861,14 +6901,6 @@ FLECS_API
 ecs_world_t* ecs_get_stage(
     const ecs_world_t *world,
     int32_t stage_id);
-
-/** Get actual world from world.
- * @param world A pointer to a stage or the world.
- * @return The world.
- */
-FLECS_API
-const ecs_world_t* ecs_get_world(
-    const ecs_world_t *world);
 
 /** Test whether the current world object is readonly.
  * This function allows the code to test whether the currently used world object
@@ -11478,7 +11510,7 @@ public:
      * @param ctx The world context.
      */
     void set_context(void* ctx) const {
-        ecs_set_context(m_world, ctx);
+        ecs_set_ctx(m_world, ctx);
     }
 
     /** Get world context.
@@ -11486,7 +11518,7 @@ public:
      * @return The configured world context.
      */
     void* get_context() const {
-        return ecs_get_context(m_world);
+        return ecs_get_ctx(m_world);
     }
 
     /** Preallocate memory for number of entities.

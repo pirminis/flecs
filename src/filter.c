@@ -355,10 +355,6 @@ bool ecs_term_is_set(
 bool ecs_term_is_trivial(
     ecs_term_t *term)
 {
-    if (term->inout != EcsInOutDefault) {
-        return false;
-    }
-
     if (term->args[0].entity != EcsThis) {
         return false;
     }
@@ -367,11 +363,7 @@ bool ecs_term_is_trivial(
         return false;
     }
 
-    if (term->oper != EcsAnd && term->oper != EcsAndFrom) {
-        return false;
-    }
-
-    if (term->name != NULL) {
+    if (term->oper != EcsAnd) {
         return false;
     }
 
@@ -771,18 +763,7 @@ ecs_iter_t ecs_filter_iter(
         for (i = 0; i < term_count; i ++) {
             ecs_term_t *term = &terms[i];
 
-            /* Only consider terms that match data from a table without 
-             * substitution. If a term does substitution we can't use its
-             * component to act as the first set of tables to iterate from. */
-            if (term->args[0].entity != EcsThis) {
-                continue;
-            }
-
-            /* Not, optional and or terms can't be used as they don't contain
-             * the superset of tables to search for */
-            if (terms->oper == EcsNot || terms->oper == EcsOptional || 
-                term->oper == EcsOr || term->oper == EcsOrFrom) 
-            {
+            if (!ecs_term_is_trivial(term)) {
                 continue;
             }
 

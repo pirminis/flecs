@@ -308,50 +308,49 @@ static
 void on_component_lifecycle(
     ecs_iter_t *it)
 {
+    ecs_assert(it->term_count == 1, ECS_INTERNAL_ERROR, NULL);
+    ecs_assert(it->ids != NULL, ECS_INTERNAL_ERROR, NULL);
+
     ecs_world_t *world = it->world;
     ecs_table_t *table = it->ctx;
     ecs_type_t table_type = table->type;
+    ecs_entity_t component = it->ids[0];
 
-    int i;
-    for (i = 0; i < it->count; i ++) {
-        ecs_entity_t component = it->entities[i];
+    if (!component || has_component(world, table_type, component)){
+        int32_t column_count = ecs_vector_count(table_type);
+        ecs_assert(!component || column_count != 0, 
+            ECS_INTERNAL_ERROR, NULL);
 
-        if (!component || has_component(world, table_type, component)){
-            int32_t column_count = ecs_vector_count(table_type);
-            ecs_assert(!component || column_count != 0, 
-                ECS_INTERNAL_ERROR, NULL);
+        if (!column_count) {
+            return;
+        }
+        
+        if (!table->c_info) {
+            table->c_info = ecs_os_calloc(
+                ECS_SIZEOF(ecs_type_info_t*) * column_count);
+        }
 
-            if (!column_count) {
-                return;
+        /* Reset lifecycle flags before recomputing */
+        table->flags &= ~EcsTableHasLifecycle;
+
+        /* Recompute lifecycle flags */
+        ecs_entity_t *array = ecs_vector_first(table_type, ecs_entity_t);
+        int32_t j;
+        for (j = 0; j < column_count; j++) {
+            ecs_entity_t c = ecs_get_typeid(world, array[j]);
+            if (!c) {
+                continue;
             }
             
-            if (!table->c_info) {
-                table->c_info = ecs_os_calloc(
-                    ECS_SIZEOF(ecs_type_info_t*) * column_count);
+            const ecs_type_info_t *c_info = ecs_get_c_info(world, c);
+            if (c_info) {
+                ecs_flags32_t flags = get_component_action_flags(c_info);
+                table->flags |= flags;
             }
 
-            /* Reset lifecycle flags before recomputing */
-            table->flags &= ~EcsTableHasLifecycle;
-
-            /* Recompute lifecycle flags */
-            ecs_entity_t *array = ecs_vector_first(table_type, ecs_entity_t);
-            int32_t j;
-            for (j = 0; j < column_count; j++) {
-                ecs_entity_t c = ecs_get_typeid(world, array[j]);
-                if (!c) {
-                    continue;
-                }
-                
-                const ecs_type_info_t *c_info = ecs_get_c_info(world, c);
-                if (c_info) {
-                    ecs_flags32_t flags = get_component_action_flags(c_info);
-                    table->flags |= flags;
-                }
-
-                /* Store pointer to c_info for fast access */
-                table->c_info[j] = (ecs_type_info_t*)c_info;
-            }        
-        }
+            /* Store pointer to c_info for fast access */
+            table->c_info[j] = (ecs_type_info_t*)c_info;
+        }        
     }
 }
 
@@ -420,7 +419,8 @@ void init_triggers(
             .events = { EcsOnComponentLifecycle },
             .term.id = id,
             .callback = on_component_lifecycle,
-            .ctx = table
+            .ctx = table,
+            .retrigger = true
         });
 
         /* Create trigger on trigger creation for fast path  */
@@ -460,10 +460,6 @@ void init_table(
 
     /* Register table with world so it can be found by its components */
     ecs_register_table(world, table);
-
-    /* Register component info flags for all columns */
-    ecs_emit(world, &(ecs_event_desc_t){ EcsOnComponentLifecycle, NULL,
-        .payload_kind = EcsPayloadTable, .payload.table.table = table });    
 }
 
 static
@@ -743,8 +739,7 @@ ecs_table_t* ecs_table_traverse_remove(
     ecs_ids_t * to_remove,
     ecs_ids_t * removed)
 {
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);
+    ecs_object_assert(world, ecs_world_t);
     
     int32_t i, count = to_remove->count;
     ecs_entity_t *entities = to_remove->array;
@@ -829,8 +824,7 @@ ecs_table_t* ecs_table_traverse_add(
     ecs_ids_t * to_add,
     ecs_ids_t * added)    
 {
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);
+    ecs_object_assert(world, ecs_world_t);
 
     int32_t i, count = to_add->count;
     ecs_entity_t *entities = to_add->array;
@@ -991,8 +985,7 @@ ecs_table_t* find_or_create(
     ecs_world_t *world,
     ecs_ids_t *ids)
 {    
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);   
+    ecs_object_assert(world, ecs_world_t);
 
     /* Make sure array is ordered and does not contain duplicates */
     int32_t type_count = ids->count;
@@ -1047,8 +1040,7 @@ ecs_table_t* ecs_table_find_or_create(
     ecs_world_t * world,
     ecs_ids_t * components)
 {
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);   
+    ecs_object_assert(world, ecs_world_t);  
     return find_or_create(world, components);
 }
 
@@ -1064,8 +1056,7 @@ ecs_table_t* ecs_table_from_type(
 void ecs_init_root_table(
     ecs_world_t *world)
 {
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);   
+    ecs_object_assert(world, ecs_world_t);
 
     ecs_ids_t entities = {
         .array = NULL,
@@ -1079,10 +1070,8 @@ void ecs_table_clear_edges(
     ecs_world_t *world,
     ecs_table_t *table)
 {
+    ecs_object_assert(world, ecs_world_t);
     (void)world;
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);   
-
     uint32_t i;
 
     if (table->lo_edges) {

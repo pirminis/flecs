@@ -239,58 +239,6 @@ int ecs_get_column_info(
     }
 }
 
-void ecs_emit(
-    ecs_world_t * world,
-    ecs_event_desc_t *desc)
-{
-    ecs_ids_t ids_storage, *ids = desc->ids;
-    ecs_table_t *table = NULL;
-    ecs_data_t *data = NULL;
-    int32_t row = 0;
-    int32_t count = 1;
-    ecs_entity_t event = desc->event;
-
-    if (desc->payload_kind == EcsPayloadEntity) {
-        ecs_assert(desc->payload.entity != 0, ECS_INTERNAL_ERROR, NULL);
-        ecs_record_t *r = ecs_eis_get(world, desc->payload.entity);
-        if (r) {
-            bool is_watched;
-            table = r->table;
-            row = ecs_record_to_row(r->row, &is_watched);
-        }
-
-    } else if (desc->payload_kind == EcsPayloadTable) {
-        ecs_assert(desc->payload.table.table != NULL, ECS_INTERNAL_ERROR, NULL);
-        table = desc->payload.table.table;
-        row = desc->payload.table.offset;
-        int32_t payload_count = desc->payload.table.count;
-        if (!payload_count) {
-            count = payload_count - row;
-        } else {
-            count = payload_count;
-        }
-    }
-
-    if (table) {
-        data = ecs_table_get_data(table);
-        if (!ids) {
-            ids = &ids_storage;
-            ids_storage.array = ecs_vector_first(table->type, ecs_id_t);
-            ids_storage.count = ecs_vector_count(table->type);
-        }
-    }
-    
-    ecs_assert(ids->count != 0, ECS_INVALID_PARAMETER, NULL);
-
-    ecs_id_t *id_array = ids->array;
-    int32_t id_count = ids->count;
-
-    int i;
-    for (i = 0; i < id_count; i ++) {
-        ecs_triggers_notify(world, id_array[i], event, table, data, row, count);
-    }
-}
-
 static
 void instantiate(
     ecs_world_t *world,
@@ -1124,8 +1072,7 @@ void add_remove(
     ecs_ids_t * to_add,
     ecs_ids_t * to_remove)
 {
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);
+    ecs_object_assert(world, ecs_world_t);
     ecs_assert(to_add->count < ECS_MAX_ADD_REMOVE, ECS_INVALID_PARAMETER, NULL);
     ecs_assert(to_remove->count < ECS_MAX_ADD_REMOVE, ECS_INVALID_PARAMETER, NULL);
 
@@ -2661,12 +2608,14 @@ const void* ecs_get_id(
     ecs_id_t id)
 {
     ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
+
     ecs_assert(ecs_is_valid(world, entity), ECS_INVALID_PARAMETER, NULL);
     ecs_assert(ecs_is_valid(world, id), ECS_INVALID_PARAMETER, NULL);
     ecs_assert(ecs_stage_from_readonly_world(world)->asynchronous == false, 
         ECS_INVALID_PARAMETER, NULL);
 
     world = ecs_get_world(world);
+    ecs_object_assert(world, ecs_world_t);
 
     ecs_record_t *r = ecs_eis_get(world, entity);
     if (!r) {
@@ -2691,7 +2640,6 @@ const void* ecs_get_id(
 
     bool is_monitored;
     int32_t row = ecs_record_to_row(r->row, &is_monitored);
-
     return get_component_w_index(table, tr->column, row);
 }
 
@@ -2854,6 +2802,7 @@ ecs_entity_t assign_ptr_w_id(
     bool do_notify)
 {
     ecs_stage_t *stage = ecs_stage_from_world(&world);
+    ecs_object_assert(world, ecs_world_t);
 
     ecs_ids_t added = {
         .array = &id,
@@ -3132,7 +3081,6 @@ const char* ecs_get_name(
     ecs_assert(ecs_is_valid(world, entity), ECS_INVALID_PARAMETER, NULL);
 
     const EcsName *id = ecs_get(world, entity, EcsName);
-
     if (id) {
         return id->value;
     } else {
@@ -3261,8 +3209,7 @@ void ecs_ensure(
     ecs_world_t *world,
     ecs_entity_t entity)
 {
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INVALID_PARAMETER, NULL);
+    ecs_object_assert(world, ecs_world_t);
     ecs_assert(entity != 0, ECS_INVALID_PARAMETER, NULL);
 
     if (ecs_eis_is_alive(world, entity)) {

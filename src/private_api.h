@@ -4,7 +4,7 @@
 #include "private_types.h"
 
 ////////////////////////////////////////////////////////////////////////////////
-//// Core bootstrap functions
+//// Bootstrap functions
 ////////////////////////////////////////////////////////////////////////////////
 
 #define ECS_TYPE_DECL(component)\
@@ -129,15 +129,16 @@ void ecs_clear_id_record(
 
 void ecs_triggers_notify(
     ecs_world_t *world,
-    ecs_id_t id,
+    ecs_object_t *observable,
+    ecs_ids_t *ids,
     ecs_entity_t event,
+    ecs_entity_t entity,
     ecs_table_t *table,
-    ecs_data_t *data,
     int32_t row,
     int32_t count);
 
 ecs_map_t* ecs_triggers_get(
-    const ecs_world_t *world,
+    const ecs_object_t *object,
     ecs_id_t id,
     ecs_entity_t event);
 
@@ -512,10 +513,6 @@ bool ecs_query_match(
     const ecs_query_t *query,
     ecs_match_failure_t *failure_info);
 
-void ecs_query_notify(
-    ecs_world_t *world,
-    ecs_query_t *query,
-    ecs_query_event_t *event);
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Filter API
@@ -567,6 +564,50 @@ void ecs_os_time_sleep(
 FLECS_API
 void ecs_increase_timer_resolution(
     bool enable);
+
+
+////////////////////////////////////////////////////////////////////////////////
+//// Object API
+////////////////////////////////////////////////////////////////////////////////
+
+void _ecs_object_init(
+    ecs_object_t *object,
+    int32_t kind,
+    ecs_size_t size,
+    ecs_mixins_t *mixins);
+
+#define ecs_object_init(object, type)\
+    _ecs_object_init(object, ECS_##type##_MAGIC, sizeof(type), &type##_mixins)
+
+void _ecs_object_fini(
+    ecs_object_t *object,
+    int32_t kind);
+
+#define ecs_object_fini(object, type)\
+    _ecs_object_fini(object, ECS_##type##_MAGIC)
+
+#ifndef NDEBUG
+void _ecs_object_assert(
+    const ecs_object_t *object,
+    int32_t type,
+    const char *file,
+    int32_t line);
+
+#define ecs_object_assert(object, type)\
+    _ecs_object_assert(object, ECS_##type##_MAGIC, __FILE__, __LINE__)
+#else
+#define ecs_object_assert(object, type)
+#endif
+
+bool _ecs_object_is(
+    const ecs_object_t *object,
+    int32_t type);
+
+#define ecs_object_is(object, type)\
+    _ecs_object_is(object, ECS_##type##_MAGIC)
+
+ecs_observable_t* ecs_get_observable(
+    const ecs_object_t *object);
 
 ////////////////////////////////////////////////////////////////////////////////
 //// Utilities

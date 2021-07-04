@@ -11,8 +11,7 @@ bool path_append(
     const char *prefix,
     ecs_strbuf_t *buf)
 {
-    ecs_assert(world != NULL, ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);
+    ecs_object_assert(world, ecs_world_t);
 
     ecs_type_t type = ecs_get_type(world, child);
     ecs_entity_t cur;
@@ -45,8 +44,7 @@ ecs_entity_t find_as_alias(
     const ecs_world_t *world,
     const char *name)
 {
-    ecs_assert(world != NULL, ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);
+    ecs_object_assert(world, ecs_world_t);
 
     int32_t i, count = ecs_vector_count(world->aliases);
     ecs_alias_t *aliases = ecs_vector_first(world->aliases, ecs_alias_t);
@@ -144,9 +142,7 @@ ecs_entity_t find_child(
     ecs_entity_t parent,
     const char *symbol)
 {        
-    ecs_assert(world != NULL, ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);
-
+    ecs_object_assert(world, ecs_world_t);
     (void)parent;
     
     ecs_sparse_each(world->store.tables, ecs_table_t, table, {
@@ -533,8 +529,7 @@ const char* ecs_set_name_prefix(
     ecs_world_t *world,
     const char *prefix)
 {
-    ecs_assert(world != NULL, ECS_INTERNAL_ERROR, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INTERNAL_ERROR, NULL);
+    ecs_object_assert(world, ecs_world_t);
 
     const char *old_prefix = world->name_prefix;
     world->name_prefix = prefix;
@@ -625,8 +620,7 @@ void ecs_use(
     ecs_entity_t entity,
     const char *name)
 {
-    ecs_assert(world != NULL, ECS_INVALID_PARAMETER, NULL);
-    ecs_assert(world->magic == ECS_WORLD_MAGIC, ECS_INVALID_PARAMETER, NULL);
+    ecs_object_assert(world, ecs_world_t);
 
     ecs_assert(entity != 0, ECS_INVALID_PARAMETER, NULL);
     ecs_assert(name != NULL, ECS_INVALID_PARAMETER, NULL);

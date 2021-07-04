@@ -495,7 +495,7 @@ public:
      * @param ctx The world context.
      */
     void set_context(void* ctx) const {
-        ecs_set_context(m_world, ctx);
+        ecs_set_ctx(m_world, ctx);
     }
 
     /** Get world context.
@@ -503,7 +503,7 @@ public:
      * @return The configured world context.
      */
     void* get_context() const {
-        return ecs_get_context(m_world);
+        return ecs_get_ctx(m_world);
     }
 
     /** Preallocate memory for number of entities.
